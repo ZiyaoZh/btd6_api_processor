@@ -36,6 +36,11 @@ def pick_current_or_latest(events: list[dict[str, Any]]) -> dict[str, Any] | Non
     return sorted(events, key=start_distance)[0]
 
 
+def normalize_translation_key(value: str) -> str:
+    """将翻译键归一化：移除所有空白并转为小写。"""
+    return re.sub(r"\s+", "", value).lower()
+
+
 def parse_translation_tables(md_path: Path) -> dict[str, dict[str, str]]:
     if not md_path.exists():
         return {}
@@ -78,7 +83,9 @@ def parse_translation_tables(md_path: Path) -> dict[str, dict[str, str]]:
 
         eng, zh = cells[0], cells[1]
         if eng and zh:
+            zh = re.sub(r"\s+", "", zh)
             result[current_category][eng] = zh
+            result[current_category][normalize_translation_key(eng)] = zh
 
     return result
 
@@ -93,8 +100,16 @@ def tr(value: str | None, table: dict[str, str]) -> str:
     if normalized in table:
         return table[normalized]
 
+    normalized_key = normalize_translation_key(normalized)
+    if normalized_key in table:
+        return table[normalized_key]
+
     titled = normalized[:1].upper() + normalized[1:] if normalized else normalized
-    return table.get(titled, value)
+    if titled in table:
+        return table[titled]
+
+    titled_key = normalize_translation_key(titled)
+    return table.get(titled_key, value)
 
 
 def tr_level_label(level: str) -> str:
@@ -112,6 +127,111 @@ def fmt_bool(value: Any) -> str:
     if isinstance(value, bool):
         return "无" if value is False else "有"
     return str(value)
+
+
+def _format_multiplier_percent(value: Any) -> str | None:
+    if not isinstance(value, (int, float)) or isinstance(value, bool):
+        return None
+    percent = value * 100
+    if abs(percent - round(percent)) < 1e-9:
+        return f"{int(round(percent))}%"
+    return f"{percent:.2f}".rstrip("0").rstrip(".") + "%"
+
+
+def format_bloon_modifiers(doc: dict[str, Any]) -> str | None:
+    modifiers = doc.get("_bloonModifiers")
+    if not isinstance(modifiers, dict):
+        return None
+
+    items: list[str] = []
+    field_map = {
+        "speedMultiplier": "气球速度",
+        "moabSpeedMultiplier": "MOAB速度",
+        "bossSpeedMultiplier": "BOSS速度",
+        "regrowRateMultiplier": "重生率",
+    }
+    for key, label in field_map.items():
+        value = modifiers.get(key)
+        if isinstance(value, (int, float)) and not isinstance(value, bool) and abs(value - 1.0) > 1e-9:
+            percent = _format_multiplier_percent(value)
+            if percent:
+                items.append(f"{label}{percent}")
+
+    health_map = {
+        "bloons": "气球血量",
+        "moabs": "MOAB血量",
+        "boss": "BOSS血量",
+    }
+    health = modifiers.get("healthMultipliers")
+    if isinstance(health, dict):
+        for key, label in health_map.items():
+            value = health.get(key)
+            if isinstance(value, (int, float)) and not isinstance(value, bool) and abs(value - 1.0) > 1e-9:
+                percent = _format_multiplier_percent(value)
+                if percent:
+                    items.append(f"{label}{percent}")
+
+    if modifiers.get("allCamo") is True:
+        items.append("全迷彩")
+    if modifiers.get("allRegen") is True:
+        items.append("全重生")
+
+    return "、".join(items) if items else None
+
+
+def format_tower_rules(doc: dict[str, Any], trans: dict[str, dict[str, str]]) -> tuple[str | None, str | None]:
+    towers = doc.get("_towers")
+    if not isinstance(towers, list):
+        return None, None
+
+    heroes: list[str] = []
+    monkeys: list[str] = []
+
+    for tower_info in towers:
+        if not isinstance(tower_info, dict):
+            continue
+
+        tower_name = str(tower_info.get("tower", "")).strip()
+        if not tower_name:
+            continue
+
+        max_count = tower_info.get("max")
+        is_hero = tower_info.get("isHero") is True
+        if is_hero:
+            if max_count == 0:
+                continue
+            hero_name = tr(tower_name, trans.get("hero", {}))
+            if hero_name not in heroes:
+                heroes.append(hero_name)
+            continue
+
+        if max_count == 0:
+            continue
+
+        monkey_name = tr(tower_name, trans.get("tower", {}))
+        p1_block = tower_info.get("path1NumBlockedTiers", 0)
+        p2_block = tower_info.get("path2NumBlockedTiers", 0)
+        p3_block = tower_info.get("path3NumBlockedTiers", 0)
+        if all(isinstance(x, int) for x in (p1_block, p2_block, p3_block)):
+            tier1 = max(0, 5 - p1_block)
+            tier2 = max(0, 5 - p2_block)
+            tier3 = max(0, 5 - p3_block)
+            tier_text = f"{tier1}-{tier2}-{tier3}"
+        else:
+            tier_text = "5-5-5"
+
+        extra: list[str] = []
+        if isinstance(max_count, int) and max_count > 0:
+            extra.append(f"最多{max_count}")
+        if tier_text != "5-5-5":
+            extra.append(tier_text)
+
+        display = monkey_name if not extra else f"{monkey_name}（{'，'.join(extra)}）"
+        monkeys.append(display)
+
+    hero_text = "、".join(heroes) if heroes else None
+    monkey_text = "、".join(monkeys) if monkeys else None
+    return hero_text, monkey_text
 
 
 def tr_reward_item(item: str, trans: dict[str, dict[str, str]]) -> str:
@@ -147,7 +267,7 @@ def challenge_doc_brief(doc: dict[str, Any], trans: dict[str, dict[str, str]]) -
 
 
 def challenge_doc_detail(doc: dict[str, Any], trans: dict[str, dict[str, str]]) -> list[str]:
-    return [
+    lines = [
         f"地图: {tr(doc.get('map'), trans.get('map', {}))}",
         f"模式: {tr(doc.get('mode'), trans.get('mode', {}))}",
         f"难度: {tr(doc.get('difficulty'), trans.get('difficulty', {}))}",
@@ -160,6 +280,18 @@ def challenge_doc_detail(doc: dict[str, Any], trans: dict[str, dict[str, str]]) 
         f"禁止出售: {fmt_bool(doc.get('disableSelling', False))}",
         f"最大塔数: {doc.get('maxTowers', '?')}",
     ]
+
+    modifiers = format_bloon_modifiers(doc)
+    if modifiers:
+        lines.append(f"修改器: {modifiers}")
+
+    heroes, monkeys = format_tower_rules(doc, trans)
+    if heroes:
+        lines.append(f"英雄: {heroes}")
+    if monkeys:
+        lines.append(f"猴子: {monkeys}")
+
+    return lines
 
 
 def sanitize_id(value: str | None) -> str:

@@ -214,6 +214,30 @@ def render_markdown_report(table_data: dict[str, Any], payload: dict[str, Any]) 
     return "\n".join(lines)
 
 
+def _is_no_scores_error(exc: Exception) -> bool:
+    msg = str(exc)
+    return "No Scores Available" in msg
+
+
+def _render_no_scores_markdown(table_data: dict[str, Any], page: int) -> str:
+    lines = [
+        f"# {table_data['title']}",
+        "",
+        f"活动: {table_data['event_name']}",
+        f"ID: {table_data['event_id']}",
+        f"时间: {table_data['event_time']}",
+        f"页码: {page}/1",
+        "",
+        "排行榜暂无可用成绩（活动可能尚未开始）。",
+        "",
+        "上一页: 无",
+        "下一页: 无",
+        "---",
+        "数据来源: Ninja Kiwi Open Data API",
+    ]
+    return "\n".join(lines)
+
+
 def resolve_leaderboard(
     client: ApiClient,
     leaderboard_type: str,
@@ -239,28 +263,40 @@ def resolve_leaderboard(
     raw = fetch_raw_data(client)
     table_data = build_single_leaderboard_table_data(leaderboard_type, page, raw)
     if output_format == "markdown":
-        payload = client.get(append_page(table_data["board_url"], page))
-        content = render_markdown_report(table_data, payload)
+        try:
+            payload = client.get(append_page(table_data["board_url"], page))
+            content = render_markdown_report(table_data, payload)
+        except RuntimeError as exc:
+            if not _is_no_scores_error(exc):
+                raise
+            content = _render_no_scores_markdown(table_data, page)
         file_path = Path(table_data["folder"]) / f"{table_data['event_id']}_{table_data['suffix']}.md"
         save_cached_file(file_path, content)
     elif output_format == "image":
-        if table_data.get("is_boss"):
-            # Boss 每页 25 条，固定尝试拉取前 6 页，最多 150 人。
-            payload_1 = client.get(append_page(table_data["board_url"], 1))
-            api_max_pages = int(payload_1.get("maxPages", 1) or 1)
-            entries: list[dict[str, Any]] = list(payload_1.get("body", []))
-            for p in range(2, min(api_max_pages, 6) + 1):
-                payload_p = client.get(append_page(table_data["board_url"], p))
-                entries.extend(list(payload_p.get("body", [])))
-            entries = entries[:150]
-            image_total_pages = 1
-        else:
-            # 竞速固定前 100 人：第一页和第二页。
-            payload_1 = client.get(append_page(table_data["board_url"], 1))
-            payload_2 = client.get(append_page(table_data["board_url"], 2))
-            entries = list(payload_1.get("body", [])) + list(payload_2.get("body", []))
-            entries = entries[:100]
-            image_total_pages = 1
+        entries: list[dict[str, Any]] = []
+        image_total_pages = 1
+        try:
+            if table_data.get("is_boss"):
+                # Boss 每页 25 条，固定尝试拉取前 6 页，最多 150 人。
+                payload_1 = client.get(append_page(table_data["board_url"], 1))
+                api_max_pages = int(payload_1.get("maxPages", 1) or 1)
+                entries = list(payload_1.get("body", []))
+                for p in range(2, min(api_max_pages, 6) + 1):
+                    payload_p = client.get(append_page(table_data["board_url"], p))
+                    entries.extend(list(payload_p.get("body", [])))
+                entries = entries[:150]
+                image_total_pages = 1
+            else:
+                # 竞速固定前 100 人：第一页和第二页。
+                payload_1 = client.get(append_page(table_data["board_url"], 1))
+                payload_2 = client.get(append_page(table_data["board_url"], 2))
+                entries = list(payload_1.get("body", [])) + list(payload_2.get("body", []))
+                entries = entries[:100]
+                image_total_pages = 1
+        except RuntimeError as exc:
+            if not _is_no_scores_error(exc):
+                raise
+            table_data["total_submissions"] = 0
 
         rendered_entries = [
             {
