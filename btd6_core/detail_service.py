@@ -8,7 +8,6 @@ from api_raw_fetcher import ApiClient, fetch_raw_data
 from btd6_core.cache_store import get_cached_content, index_put, load_index, save_cached_file, save_index
 from btd6_core.common import (
     challenge_doc_detail,
-    pick_current_or_latest,
     sanitize_id,
     scoring_type_to_label,
     to_dt,
@@ -24,6 +23,17 @@ def _normalize_scoring_type(value: Any) -> str:
     return "GameTime"
 
 
+def _pick_latest_by_start(events: list[dict[str, Any]]) -> dict[str, Any] | None:
+    if not events:
+        return None
+
+    def start_key(event: dict[str, Any]) -> int:
+        start = event.get("start")
+        return start if isinstance(start, int) else -1
+
+    return max(events, key=start_key)
+
+
 def get_latest_event(raw: dict[str, Any], detail_type: str) -> dict[str, Any] | None:
     mapping = {
         "race": "races",
@@ -37,7 +47,7 @@ def get_latest_event(raw: dict[str, Any], detail_type: str) -> dict[str, Any] | 
     events = raw.get(key, [])
     if detail_type == "daily":
         return events[0] if events else None
-    return pick_current_or_latest(events)
+    return _pick_latest_by_start(events)
 
 
 def build_single_detail_report(client: ApiClient, trans: dict[str, dict[str, str]], detail_type: str, raw: dict[str, Any]) -> tuple[str, str, str]:
@@ -150,6 +160,7 @@ def resolve_detail(client: ApiClient, trans: dict[str, dict[str, str]], detail_t
         cached_path, cached_content = get_cached_content(index_data, key)
         if cached_path and cached_content is not None:
             return cached_path, cached_content, True
+        raise RuntimeError(f"未找到 {detail_type} 详情缓存，请先运行 refresh-service 刷新数据")
 
     raw = fetch_raw_data(client)
     event_id, folder, content = build_single_detail_report(client, trans, detail_type, raw)

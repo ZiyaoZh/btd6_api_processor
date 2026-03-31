@@ -255,10 +255,12 @@ def resolve_leaderboard(
             cached_path, cached_content = get_cached_content(index_data, key)
             if cached_path and cached_content is not None:
                 return cached_path, cached_content, True
+            raise RuntimeError(f"未找到 {leaderboard_type} markdown 缓存，请先运行 refresh-service 刷新数据")
         else:
             cached_path = get_cached_path(index_data, key)
             if cached_path:
                 return cached_path, "", True
+            raise RuntimeError(f"未找到 {leaderboard_type} image 缓存，请先运行 refresh-service 刷新数据")
 
     raw = fetch_raw_data(client)
     table_data = build_single_leaderboard_table_data(leaderboard_type, page, raw)

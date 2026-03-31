@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from math import ceil
 from pathlib import Path
 from typing import Any
@@ -176,5 +177,13 @@ def render_leaderboard_image(table_data: dict[str, Any], entries: list[dict[str,
             y = y2
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    draw.text((panel_x1 + 32, panel_y2 + 4), "数据来源: btd6 open data", font=_load_font(22), fill="#6b7280")
+    footer_font = _load_font(22)
+    footer_y = panel_y2 + 4
+    draw.text((panel_x1 + 32, footer_y), "数据来源: btd6 open data", font=footer_font, fill="#6b7280")
+
+    fetched_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    fetched_text = f"数据获取时间: {fetched_at}"
+    fetched_w = draw.textlength(fetched_text, font=footer_font)
+    fetched_x = panel_x2 - 32 - fetched_w
+    draw.text((fetched_x, footer_y), fetched_text, font=footer_font, fill="#6b7280")
     img.save(output_path)

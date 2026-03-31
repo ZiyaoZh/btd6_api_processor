@@ -20,8 +20,9 @@
   - markdown 文本榜单
   - image 图片榜单（适合社群转发）
 - 支持翻译表（translate.md）做中文化映射。
-- 支持缓存优先 + 强制刷新（refresh）策略。
+- 支持缓存只读查询 + 独立刷新服务策略。
 - 支持一键全量更新（update）。
+- 支持定时刷新服务（默认每 10 分钟）。
 
 ---
 
@@ -86,10 +87,10 @@ python btd6_cli.py --help
 - `--api-key`：Ninja Kiwi API Key，可选。
 - `--translate`：翻译表路径，默认 `translate.md`。
 - `--output`：主输出文件路径，默认 `btd6_digest.md`。
-- `--mode`：模式，可选 `summary` / `detail` / `leaderboard` / `update`。
-- `--refresh`：忽略缓存，强制重新拉取并覆盖。
+- `--mode`：模式，可选 `summary` / `detail` / `leaderboard` / `update` / `refresh-service`。
+- `--refresh-interval-seconds`：refresh-service 刷新间隔，默认 600 秒。
 
-### 4.2 summary 模式
+### 4.2 summary 模式（只读缓存）
 
 生成当前活动简报（Race/Boss/Odyssey/Daily）。
 
@@ -99,7 +100,7 @@ python btd6_cli.py \
   --output out/summary.md
 ```
 
-### 4.3 detail 模式
+### 4.3 detail 模式（只读缓存）
 
 生成指定活动类型的“最新一期详细信息”。
 
@@ -119,7 +120,7 @@ python btd6_cli.py \
 - 若只传一个类型，输出该类型详情。
 - 若传多个类型，主输出会包含每个类型的文件路径和合并内容。
 
-### 4.4 leaderboard 模式
+### 4.4 leaderboard 模式（只读缓存）
 
 生成排行榜（当前实现固定从第一页起拉取，内部按类型取固定人数）。
 
@@ -151,16 +152,28 @@ python btd6_cli.py \
 - `--output` 保存的是执行摘要（来源、生成文件路径），真正榜单文件写入活动目录。
 - 图片榜单仅显示：排行、玩家、得分。
 
-### 4.5 update 模式
+### 4.5 update 模式（主动刷新）
 
 一键更新所有核心数据：
+- 简报：summary
 - 详情：race / boss / odyssey / daily
-- 排行榜：race / boss-standard / boss-elite（markdown）
+- 排行榜：race / boss-standard / boss-elite（markdown + image）
 
 ```bash
 python btd6_cli.py \
   --mode update \
   --output out/update.md
+```
+
+### 4.6 refresh-service 模式（定时刷新）
+
+启动常驻刷新服务，默认每 10 分钟刷新一次全部数据。
+
+```bash
+python btd6_cli.py \
+  --mode refresh-service \
+  --refresh-interval-seconds 600 \
+  --output out/refresh-service.log
 ```
 
 ---
@@ -217,8 +230,9 @@ Image：
 ```
 
 读取逻辑：
-- 默认优先返回缓存文件。
-- 使用 `--refresh` 时跳过缓存，重新请求并覆盖缓存与索引。
+- `summary` / `detail` / `leaderboard` 模式只读取缓存文件。
+- 缓存不存在时会报错提示先执行 `update` 或 `refresh-service`。
+- 远程刷新仅由 `update` 与 `refresh-service` 负责。
 
 ---
 
@@ -254,6 +268,7 @@ print(raw.keys())  # dict_keys(['races', 'bosses', 'odyssey', 'daily'])
 文件：`btd6_core/summary_service.py`
 
 - `build_report(client, trans) -> str`
+- `resolve_summary(client, trans, refresh=False) -> tuple[path, content, cached]`
 
 示例：
 
@@ -282,6 +297,9 @@ report = build_report(client, trans)
 - `content`：详情文本
 - `cached`：是否来自缓存
 
+说明：
+- `refresh=False` 时只读缓存，不会主动请求远程。
+
 ### 7.4 排行榜服务
 
 文件：`btd6_core/leaderboard_service.py`
@@ -298,13 +316,22 @@ report = build_report(client, trans)
 - `content`：markdown 内容（image 时为空字符串）
 - `cached`：是否来自缓存
 
+说明：
+- `refresh=False` 时只读缓存，不会主动请求远程。
+
 ### 7.5 更新服务
 
 文件：`btd6_core/update_service.py`
 
 - `update_all_data(client, trans) -> str`
 
-用于批量刷新所有详情和排行榜（默认第一页基准 + 固定人数策略）。
+用于批量刷新 summary、所有详情和排行榜（默认第一页基准 + 固定人数策略）。
+
+文件：`btd6_core/refresh_service.py`
+
+- `run_refresh_service(client, trans, interval_seconds=600, log_path=None) -> None`
+
+用于常驻定时刷新服务。
 
 ---
 
@@ -351,9 +378,10 @@ report = build_report(client, trans)
 
 ### 10.1 作为定时任务
 
-每天生成简报并推送给你的业务系统：
+先启动刷新服务，再由业务侧按需读取缓存：
 
 ```bash
+python btd6_cli.py --mode refresh-service --refresh-interval-seconds 600 --output out/refresh.log
 python btd6_cli.py --mode summary --output out/summary.md
 python btd6_cli.py --mode leaderboard --leaderboard-type race --leaderboard-format image --output out/race_image.md
 ```
@@ -384,7 +412,7 @@ payload = {
 ## 11. 错误处理建议
 
 - 网络波动：已内置重试与退避；若业务侧严格 SLA，建议外层再包一层任务重试。
-- 缓存文件缺失：索引存在但文件被删时，会自动走远程拉取。
+- 缓存文件缺失：查询命令会报错，请先执行 `update` 或 `refresh-service`。
 - API 失败：`ApiClient.get` 会抛出 `RuntimeError`，上层应记录日志并告警。
 
 ---

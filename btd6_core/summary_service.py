@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 from datetime import datetime
+from pathlib import Path
 
 from api_raw_fetcher import ApiClient, fetch_raw_data
+from btd6_core.cache_store import get_cached_content, index_put, load_index, save_cached_file, save_index
 from btd6_core.common import challenge_doc_brief, pick_current_or_latest, to_dt, tr, tr_level_label
 
 
@@ -91,3 +93,20 @@ def build_report(client: ApiClient, trans: dict[str, dict[str, str]]) -> str:
     lines.append("---")
     lines.append("数据来源: Ninja Kiwi Open Data API")
     return "\n".join(lines)
+
+
+def resolve_summary(client: ApiClient, trans: dict[str, dict[str, str]], refresh: bool = False) -> tuple[Path, str, bool]:
+    key = "summary:main"
+    index_data = load_index()
+    if not refresh:
+        cached_path, cached_content = get_cached_content(index_data, key)
+        if cached_path and cached_content is not None:
+            return cached_path, cached_content, True
+        raise RuntimeError("未找到 summary 缓存，请先运行 refresh-service 刷新数据")
+
+    content = build_report(client, trans)
+    file_path = Path("summary") / "latest_summary.md"
+    save_cached_file(file_path, content)
+    index_put(index_data, key, "latest", file_path)
+    save_index(index_data)
+    return file_path, content, False

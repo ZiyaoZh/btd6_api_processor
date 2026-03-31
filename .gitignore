@@ -221,3 +221,5 @@ odyssey/*
 daily/*
 out/*
 cache_index.json
+summary/
+.vscode/
