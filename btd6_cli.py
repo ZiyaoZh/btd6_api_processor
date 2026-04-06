@@ -9,6 +9,7 @@ import sys
 from pathlib import Path
 
 from api_raw_fetcher import ApiClient
+from btd6_core.collection_event_service import resolve_collection_event
 from btd6_core.common import parse_translation_tables
 from btd6_core.detail_service import resolve_detail
 from btd6_core.leaderboard_service import resolve_leaderboard
@@ -24,9 +25,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output", default="btd6_digest.md", help="输出文件路径")
     parser.add_argument(
         "--mode",
-        choices=["summary", "detail", "leaderboard", "update", "refresh-service"],
+        choices=["summary", "detail", "leaderboard", "collection-event", "update", "refresh-service"],
         default="summary",
-        help="输出模式：summary=简报(缓存)，detail=最新一期详细信息(缓存)，leaderboard=排行榜(缓存)，update=更新所有数据，refresh-service=定时刷新服务",
+        help="输出模式：summary=简报(缓存)，detail=最新一期详细信息(缓存)，leaderboard=排行榜(缓存)，collection-event=收集活动轮换，update=更新所有数据，refresh-service=定时刷新服务",
     )
     parser.add_argument(
         "--detail-types",
@@ -50,6 +51,21 @@ def parse_args() -> argparse.Namespace:
         type=int,
         default=600,
         help="refresh-service 模式刷新间隔秒数，默认 600（10 分钟）",
+    )
+    parser.add_argument(
+        "--collection-event-output",
+        default="collection_event_schedule.json",
+        help="collection-event 模式输出的 JSON 文件路径",
+    )
+    parser.add_argument(
+        "--collection-event-image-output",
+        default="collection_event_schedule.png",
+        help="collection-event 模式输出的图片路径",
+    )
+    parser.add_argument(
+        "--only-upcoming",
+        action="store_true",
+        help="collection-event 模式仅输出当前/未来轮换",
     )
     return parser.parse_args()
 
@@ -105,6 +121,19 @@ def main() -> int:
                 report = f"# 来源: {source}\n# 文件: {path}\n\n已生成 排行榜表格图片（仅玩家与得分）。"
             else:
                 report = f"# 来源: {source}\n# 文件: {path}\n\n{content}"
+
+        elif args.mode == "collection-event":
+            json_path, _json_text, image_path, cached = resolve_collection_event(client, only_upcoming=args.only_upcoming, refresh=False)
+            report = "\n".join(
+                [
+                    "# 收集活动轮换",
+                    f"# JSON: {json_path}",
+                    f"# 图片: {image_path}",
+                    f"# 来源: {'缓存' if cached else '生成'}",
+                    "",
+                    f"模式: {'仅当前和未来轮换' if args.only_upcoming else '完整轮换'}",
+                ]
+            )
 
         elif args.mode == "update":
             report = update_all_data(client, trans)

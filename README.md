@@ -23,6 +23,8 @@
 - 支持缓存只读查询 + 独立刷新服务策略。
 - 支持一键全量更新（update）。
 - 支持定时刷新服务（默认每 10 分钟）。
+- 支持 collection event 轮换表与图片导出。
+- 支持 collection event 缓存读取，并接入现有 refresh-service 的 10 分钟刷新节奏。
 
 ---
 
@@ -39,11 +41,13 @@
 │   ├── detail_service.py      # 详情生成
 │   ├── leaderboard_service.py # 排行榜生成
 │   ├── image_renderer.py      # PNG 排行榜渲染
-│   └── update_service.py      # 全量更新流程
+│   ├── update_service.py      # 全量更新流程
+│   └── refresh_service.py     # 定时刷新服务
 ├── translate.md               # 翻译映射表
 ├── cache_index.json           # 缓存索引
 ├── race/ boss/ odyssey/ daily/# 输出目录（运行时自动创建）
-└── assets/fonts/              # 图片渲染字体缓存
+├── assets/fonts/              # 图片渲染字体缓存
+└── assets/InstaMonkeyIcon/    # collection event 图标资源
 ```
 
 ---
@@ -87,8 +91,11 @@ python btd6_cli.py --help
 - `--api-key`：Ninja Kiwi API Key，可选。
 - `--translate`：翻译表路径，默认 `translate.md`。
 - `--output`：主输出文件路径，默认 `btd6_digest.md`。
-- `--mode`：模式，可选 `summary` / `detail` / `leaderboard` / `update` / `refresh-service`。
+- `--mode`：模式，可选 `summary` / `detail` / `leaderboard` / `collection-event` / `update` / `refresh-service`。
 - `--refresh-interval-seconds`：refresh-service 刷新间隔，默认 600 秒。
+- `--collection-event-output`：collection-event 模式的 JSON 输出路径，默认 `collection_event_schedule.json`。
+- `--collection-event-image-output`：collection-event 模式的图片输出路径，默认 `collection_event_schedule.png`。
+- `--only-upcoming`：collection-event 模式仅输出当前和未来轮换。
 
 ### 4.2 summary 模式（只读缓存）
 
@@ -151,6 +158,7 @@ python btd6_cli.py \
 说明：
 - `--output` 保存的是执行摘要（来源、生成文件路径），真正榜单文件写入活动目录。
 - 图片榜单仅显示：排行、玩家、得分。
+- 图片底部左侧显示数据来源，右侧显示数据获取时间（`YYYY-MM-DD HH:MM:SS`）。
 
 ### 4.5 update 模式（主动刷新）
 
@@ -165,7 +173,22 @@ python btd6_cli.py \
   --output out/update.md
 ```
 
-### 4.6 refresh-service 模式（定时刷新）
+### 4.6 collection-event 模式（收集活动轮换）
+
+生成 collection event 的轮换 JSON 与图片。会优先读取缓存中的 JSON 和图片；如果缓存不存在，才会现场生成并写入缓存。图片图标默认读取 `assets/InstaMonkeyIcon/`，字体优先使用 `assets/fonts/Gardenia-Bold.woff2`，其次会按 `assets/fonts/` 下的其他本地字体回退。
+
+```bash
+python btd6_cli.py \
+  --mode collection-event \
+  --collection-event-output out/collection_event_schedule.json \
+  --collection-event-image-output out/collection_event_schedule.png
+```
+
+说明：
+- `--only-upcoming` 仅保留当前和未来轮换。
+- collection event 的缓存刷新已经并入 `refresh-service`，默认每 10 分钟刷新一次。
+
+### 4.7 refresh-service 模式（定时刷新）
 
 启动常驻刷新服务，默认每 10 分钟刷新一次全部数据。
 
@@ -187,7 +210,11 @@ python btd6_cli.py \
 - `odyssey/{event_id}_detail.md`
 - `daily/{event_id}_detail.md`
 
-### 5.2 排行榜输出
+### 5.2 简报输出
+
+- `summary/latest_summary.md`
+
+### 5.3 排行榜输出
 
 Markdown：
 - `race/{event_id}_top100.md`
@@ -199,10 +226,21 @@ Image：
 - `boss/{event_id}_standard_top150.png`
 - `boss/{event_id}_elite_top150.png`
 
-### 5.3 固定人数策略（image）
+### 5.4 固定人数策略（image）
 
 - Race：固定前 100 人（取前 2 页并截断）。
 - Boss：固定前 150 人（尝试前 6 页并截断）。
+
+### 5.5 collection-event 缓存输出
+
+- `collection_event/latest_collection_event.json`
+- `collection_event/latest_collection_event.png`
+- `collection_event/latest_collection_event.upcoming.json`
+- `collection_event/latest_collection_event.upcoming.png`
+
+说明：
+- `collection-event` 模式优先读取对应缓存，缓存缺失时才会生成并写入。
+- `collection-event` 的缓存刷新已经并入 `refresh-service`，默认每 10 分钟刷新一次。
 
 ---
 
@@ -366,11 +404,12 @@ report = build_report(client, trans)
 
 渲染模块：`btd6_core/image_renderer.py`
 
-- 默认自动尝试下载并缓存中文字体到 `assets/fonts/NotoSansSC-Regular.otf`。
+- collection event 绘图优先使用本地 `assets/fonts/*.woff2` 字体。
 - 竞速图布局：4 列 × 25 行。
 - Boss 图布局：3 列 × 50 行。
 - 每行字段：排行、玩家、得分。
 - 使用斑马纹提高可读性。
+- 底部页脚：左侧 `数据来源: btd6 open data`，右侧 `数据获取时间: YYYY-MM-DD HH:MM:SS`。
 
 ---
 

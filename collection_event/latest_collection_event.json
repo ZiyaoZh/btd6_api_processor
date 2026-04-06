@@ -1,0 +1,963 @@
+{
+  "source": {
+    "events_api": "/btd6/events",
+    "selection_logic": "first event with type == collectableEvent",
+    "rotation_interval_hours": 8
+  },
+  "event": {
+    "id": "mml3g892",
+    "start": 1773540000000,
+    "end": 1775527200000,
+    "start_local": "2026-03-15T10:00:00+08:00",
+    "end_local": "2026-04-07T10:00:00+08:00"
+  },
+  "generated_at_local": "2026-04-06T10:38:33.597563+08:00",
+  "rotation_count": 69,
+  "rotations": [
+    {
+      "index": 0,
+      "start": 1773540000000,
+      "end": 1773568800000,
+      "towers": [
+        "Alchemist",
+        "SniperMonkey",
+        "SuperMonkey",
+        "MonkeyAce"
+      ],
+      "start_local": "2026-03-15T10:00:00+08:00",
+      "end_local": "2026-03-15T18:00:00+08:00"
+    },
+    {
+      "index": 1,
+      "start": 1773568800000,
+      "end": 1773597600000,
+      "towers": [
+        "MonkeyVillage",
+        "WizardMonkey",
+        "Druid",
+        "Mermonkey"
+      ],
+      "start_local": "2026-03-15T18:00:00+08:00",
+      "end_local": "2026-03-16T02:00:00+08:00"
+    },
+    {
+      "index": 2,
+      "start": 1773597600000,
+      "end": 1773626400000,
+      "towers": [
+        "IceMonkey",
+        "NinjaMonkey",
+        "BombShooter",
+        "HeliPilot"
+      ],
+      "start_local": "2026-03-16T02:00:00+08:00",
+      "end_local": "2026-03-16T10:00:00+08:00"
+    },
+    {
+      "index": 3,
+      "start": 1773626400000,
+      "end": 1773655200000,
+      "towers": [
+        "TackShooter",
+        "MortarMonkey",
+        "MonkeySub",
+        "SpikeFactory"
+      ],
+      "start_local": "2026-03-16T10:00:00+08:00",
+      "end_local": "2026-03-16T18:00:00+08:00"
+    },
+    {
+      "index": 4,
+      "start": 1773655200000,
+      "end": 1773684000000,
+      "towers": [
+        "DartMonkey",
+        "BananaFarm",
+        "BoomerangMonkey",
+        "EngineerMonkey"
+      ],
+      "start_local": "2026-03-16T18:00:00+08:00",
+      "end_local": "2026-03-17T02:00:00+08:00"
+    },
+    {
+      "index": 5,
+      "start": 1773684000000,
+      "end": 1773712800000,
+      "towers": [
+        "BeastHandler",
+        "DartlingGunner",
+        "GlueGunner",
+        "Desperado"
+      ],
+      "start_local": "2026-03-17T02:00:00+08:00",
+      "end_local": "2026-03-17T10:00:00+08:00"
+    },
+    {
+      "index": 6,
+      "start": 1773712800000,
+      "end": 1773741600000,
+      "towers": [
+        "MonkeyBuccaneer",
+        "Alchemist",
+        "SniperMonkey",
+        "SuperMonkey"
+      ],
+      "start_local": "2026-03-17T10:00:00+08:00",
+      "end_local": "2026-03-17T18:00:00+08:00"
+    },
+    {
+      "index": 7,
+      "start": 1773741600000,
+      "end": 1773770400000,
+      "towers": [
+        "MonkeyAce",
+        "MonkeyVillage",
+        "WizardMonkey",
+        "Druid"
+      ],
+      "start_local": "2026-03-17T18:00:00+08:00",
+      "end_local": "2026-03-18T02:00:00+08:00"
+    },
+    {
+      "index": 8,
+      "start": 1773770400000,
+      "end": 1773799200000,
+      "towers": [
+        "WizardMonkey",
+        "Druid",
+        "Mermonkey",
+        "IceMonkey"
+      ],
+      "start_local": "2026-03-18T02:00:00+08:00",
+      "end_local": "2026-03-18T10:00:00+08:00"
+    },
+    {
+      "index": 9,
+      "start": 1773799200000,
+      "end": 1773828000000,
+      "towers": [
+        "NinjaMonkey",
+        "BombShooter",
+        "HeliPilot",
+        "TackShooter"
+      ],
+      "start_local": "2026-03-18T10:00:00+08:00",
+      "end_local": "2026-03-18T18:00:00+08:00"
+    },
+    {
+      "index": 10,
+      "start": 1773828000000,
+      "end": 1773856800000,
+      "towers": [
+        "MortarMonkey",
+        "MonkeySub",
+        "SpikeFactory",
+        "DartMonkey"
+      ],
+      "start_local": "2026-03-18T18:00:00+08:00",
+      "end_local": "2026-03-19T02:00:00+08:00"
+    },
+    {
+      "index": 11,
+      "start": 1773856800000,
+      "end": 1773885600000,
+      "towers": [
+        "BananaFarm",
+        "BoomerangMonkey",
+        "EngineerMonkey",
+        "BeastHandler"
+      ],
+      "start_local": "2026-03-19T02:00:00+08:00",
+      "end_local": "2026-03-19T10:00:00+08:00"
+    },
+    {
+      "index": 12,
+      "start": 1773885600000,
+      "end": 1773914400000,
+      "towers": [
+        "DartlingGunner",
+        "GlueGunner",
+        "Desperado",
+        "MonkeyBuccaneer"
+      ],
+      "start_local": "2026-03-19T10:00:00+08:00",
+      "end_local": "2026-03-19T18:00:00+08:00"
+    },
+    {
+      "index": 13,
+      "start": 1773914400000,
+      "end": 1773943200000,
+      "towers": [
+        "Alchemist",
+        "SniperMonkey",
+        "SuperMonkey",
+        "MonkeyAce"
+      ],
+      "start_local": "2026-03-19T18:00:00+08:00",
+      "end_local": "2026-03-20T02:00:00+08:00"
+    },
+    {
+      "index": 14,
+      "start": 1773943200000,
+      "end": 1773972000000,
+      "towers": [
+        "MonkeyVillage",
+        "WizardMonkey",
+        "Druid",
+        "Mermonkey"
+      ],
+      "start_local": "2026-03-20T02:00:00+08:00",
+      "end_local": "2026-03-20T10:00:00+08:00"
+    },
+    {
+      "index": 15,
+      "start": 1773972000000,
+      "end": 1774000800000,
+      "towers": [
+        "Druid",
+        "Mermonkey",
+        "IceMonkey",
+        "NinjaMonkey"
+      ],
+      "start_local": "2026-03-20T10:00:00+08:00",
+      "end_local": "2026-03-20T18:00:00+08:00"
+    },
+    {
+      "index": 16,
+      "start": 1774000800000,
+      "end": 1774029600000,
+      "towers": [
+        "BombShooter",
+        "HeliPilot",
+        "TackShooter",
+        "MortarMonkey"
+      ],
+      "start_local": "2026-03-20T18:00:00+08:00",
+      "end_local": "2026-03-21T02:00:00+08:00"
+    },
+    {
+      "index": 17,
+      "start": 1774029600000,
+      "end": 1774058400000,
+      "towers": [
+        "MonkeySub",
+        "SpikeFactory",
+        "DartMonkey",
+        "BananaFarm"
+      ],
+      "start_local": "2026-03-21T02:00:00+08:00",
+      "end_local": "2026-03-21T10:00:00+08:00"
+    },
+    {
+      "index": 18,
+      "start": 1774058400000,
+      "end": 1774087200000,
+      "towers": [
+        "BoomerangMonkey",
+        "EngineerMonkey",
+        "BeastHandler",
+        "DartlingGunner"
+      ],
+      "start_local": "2026-03-21T10:00:00+08:00",
+      "end_local": "2026-03-21T18:00:00+08:00"
+    },
+    {
+      "index": 19,
+      "start": 1774087200000,
+      "end": 1774116000000,
+      "towers": [
+        "GlueGunner",
+        "Desperado",
+        "MonkeyBuccaneer",
+        "Alchemist"
+      ],
+      "start_local": "2026-03-21T18:00:00+08:00",
+      "end_local": "2026-03-22T02:00:00+08:00"
+    },
+    {
+      "index": 20,
+      "start": 1774116000000,
+      "end": 1774144800000,
+      "towers": [
+        "SniperMonkey",
+        "SuperMonkey",
+        "MonkeyAce",
+        "MonkeyVillage"
+      ],
+      "start_local": "2026-03-22T02:00:00+08:00",
+      "end_local": "2026-03-22T10:00:00+08:00"
+    },
+    {
+      "index": 21,
+      "start": 1774144800000,
+      "end": 1774173600000,
+      "towers": [
+        "WizardMonkey",
+        "Druid",
+        "Mermonkey",
+        "IceMonkey"
+      ],
+      "start_local": "2026-03-22T10:00:00+08:00",
+      "end_local": "2026-03-22T18:00:00+08:00"
+    },
+    {
+      "index": 22,
+      "start": 1774173600000,
+      "end": 1774202400000,
+      "towers": [
+        "Mermonkey",
+        "IceMonkey",
+        "NinjaMonkey",
+        "BombShooter"
+      ],
+      "start_local": "2026-03-22T18:00:00+08:00",
+      "end_local": "2026-03-23T02:00:00+08:00"
+    },
+    {
+      "index": 23,
+      "start": 1774202400000,
+      "end": 1774231200000,
+      "towers": [
+        "HeliPilot",
+        "TackShooter",
+        "MortarMonkey",
+        "MonkeySub"
+      ],
+      "start_local": "2026-03-23T02:00:00+08:00",
+      "end_local": "2026-03-23T10:00:00+08:00"
+    },
+    {
+      "index": 24,
+      "start": 1774231200000,
+      "end": 1774260000000,
+      "towers": [
+        "SpikeFactory",
+        "DartMonkey",
+        "BananaFarm",
+        "BoomerangMonkey"
+      ],
+      "start_local": "2026-03-23T10:00:00+08:00",
+      "end_local": "2026-03-23T18:00:00+08:00"
+    },
+    {
+      "index": 25,
+      "start": 1774260000000,
+      "end": 1774288800000,
+      "towers": [
+        "EngineerMonkey",
+        "BeastHandler",
+        "DartlingGunner",
+        "GlueGunner"
+      ],
+      "start_local": "2026-03-23T18:00:00+08:00",
+      "end_local": "2026-03-24T02:00:00+08:00"
+    },
+    {
+      "index": 26,
+      "start": 1774288800000,
+      "end": 1774317600000,
+      "towers": [
+        "Desperado",
+        "MonkeyBuccaneer",
+        "Alchemist",
+        "SniperMonkey"
+      ],
+      "start_local": "2026-03-24T02:00:00+08:00",
+      "end_local": "2026-03-24T10:00:00+08:00"
+    },
+    {
+      "index": 27,
+      "start": 1774317600000,
+      "end": 1774346400000,
+      "towers": [
+        "SuperMonkey",
+        "MonkeyAce",
+        "MonkeyVillage",
+        "WizardMonkey"
+      ],
+      "start_local": "2026-03-24T10:00:00+08:00",
+      "end_local": "2026-03-24T18:00:00+08:00"
+    },
+    {
+      "index": 28,
+      "start": 1774346400000,
+      "end": 1774375200000,
+      "towers": [
+        "Druid",
+        "Mermonkey",
+        "IceMonkey",
+        "NinjaMonkey"
+      ],
+      "start_local": "2026-03-24T18:00:00+08:00",
+      "end_local": "2026-03-25T02:00:00+08:00"
+    },
+    {
+      "index": 29,
+      "start": 1774375200000,
+      "end": 1774404000000,
+      "towers": [
+        "IceMonkey",
+        "NinjaMonkey",
+        "BombShooter",
+        "HeliPilot"
+      ],
+      "start_local": "2026-03-25T02:00:00+08:00",
+      "end_local": "2026-03-25T10:00:00+08:00"
+    },
+    {
+      "index": 30,
+      "start": 1774404000000,
+      "end": 1774432800000,
+      "towers": [
+        "TackShooter",
+        "MortarMonkey",
+        "MonkeySub",
+        "SpikeFactory"
+      ],
+      "start_local": "2026-03-25T10:00:00+08:00",
+      "end_local": "2026-03-25T18:00:00+08:00"
+    },
+    {
+      "index": 31,
+      "start": 1774432800000,
+      "end": 1774461600000,
+      "towers": [
+        "DartMonkey",
+        "BananaFarm",
+        "BoomerangMonkey",
+        "EngineerMonkey"
+      ],
+      "start_local": "2026-03-25T18:00:00+08:00",
+      "end_local": "2026-03-26T02:00:00+08:00"
+    },
+    {
+      "index": 32,
+      "start": 1774461600000,
+      "end": 1774490400000,
+      "towers": [
+        "BeastHandler",
+        "DartlingGunner",
+        "GlueGunner",
+        "Desperado"
+      ],
+      "start_local": "2026-03-26T02:00:00+08:00",
+      "end_local": "2026-03-26T10:00:00+08:00"
+    },
+    {
+      "index": 33,
+      "start": 1774490400000,
+      "end": 1774519200000,
+      "towers": [
+        "MonkeyBuccaneer",
+        "Alchemist",
+        "SniperMonkey",
+        "SuperMonkey"
+      ],
+      "start_local": "2026-03-26T10:00:00+08:00",
+      "end_local": "2026-03-26T18:00:00+08:00"
+    },
+    {
+      "index": 34,
+      "start": 1774519200000,
+      "end": 1774548000000,
+      "towers": [
+        "MonkeyAce",
+        "MonkeyVillage",
+        "WizardMonkey",
+        "Druid"
+      ],
+      "start_local": "2026-03-26T18:00:00+08:00",
+      "end_local": "2026-03-27T02:00:00+08:00"
+    },
+    {
+      "index": 35,
+      "start": 1774548000000,
+      "end": 1774576800000,
+      "towers": [
+        "Mermonkey",
+        "IceMonkey",
+        "NinjaMonkey",
+        "BombShooter"
+      ],
+      "start_local": "2026-03-27T02:00:00+08:00",
+      "end_local": "2026-03-27T10:00:00+08:00"
+    },
+    {
+      "index": 36,
+      "start": 1774576800000,
+      "end": 1774605600000,
+      "towers": [
+        "NinjaMonkey",
+        "BombShooter",
+        "HeliPilot",
+        "TackShooter"
+      ],
+      "start_local": "2026-03-27T10:00:00+08:00",
+      "end_local": "2026-03-27T18:00:00+08:00"
+    },
+    {
+      "index": 37,
+      "start": 1774605600000,
+      "end": 1774634400000,
+      "towers": [
+        "MortarMonkey",
+        "MonkeySub",
+        "SpikeFactory",
+        "DartMonkey"
+      ],
+      "start_local": "2026-03-27T18:00:00+08:00",
+      "end_local": "2026-03-28T02:00:00+08:00"
+    },
+    {
+      "index": 38,
+      "start": 1774634400000,
+      "end": 1774663200000,
+      "towers": [
+        "BananaFarm",
+        "BoomerangMonkey",
+        "EngineerMonkey",
+        "BeastHandler"
+      ],
+      "start_local": "2026-03-28T02:00:00+08:00",
+      "end_local": "2026-03-28T10:00:00+08:00"
+    },
+    {
+      "index": 39,
+      "start": 1774663200000,
+      "end": 1774692000000,
+      "towers": [
+        "DartlingGunner",
+        "GlueGunner",
+        "Desperado",
+        "MonkeyBuccaneer"
+      ],
+      "start_local": "2026-03-28T10:00:00+08:00",
+      "end_local": "2026-03-28T18:00:00+08:00"
+    },
+    {
+      "index": 40,
+      "start": 1774692000000,
+      "end": 1774720800000,
+      "towers": [
+        "Alchemist",
+        "SniperMonkey",
+        "SuperMonkey",
+        "MonkeyAce"
+      ],
+      "start_local": "2026-03-28T18:00:00+08:00",
+      "end_local": "2026-03-29T02:00:00+08:00"
+    },
+    {
+      "index": 41,
+      "start": 1774720800000,
+      "end": 1774749600000,
+      "towers": [
+        "MonkeyVillage",
+        "WizardMonkey",
+        "Druid",
+        "Mermonkey"
+      ],
+      "start_local": "2026-03-29T02:00:00+08:00",
+      "end_local": "2026-03-29T10:00:00+08:00"
+    },
+    {
+      "index": 42,
+      "start": 1774749600000,
+      "end": 1774778400000,
+      "towers": [
+        "IceMonkey",
+        "NinjaMonkey",
+        "BombShooter",
+        "HeliPilot"
+      ],
+      "start_local": "2026-03-29T10:00:00+08:00",
+      "end_local": "2026-03-29T18:00:00+08:00"
+    },
+    {
+      "index": 43,
+      "start": 1774778400000,
+      "end": 1774807200000,
+      "towers": [
+        "BombShooter",
+        "HeliPilot",
+        "TackShooter",
+        "MortarMonkey"
+      ],
+      "start_local": "2026-03-29T18:00:00+08:00",
+      "end_local": "2026-03-30T02:00:00+08:00"
+    },
+    {
+      "index": 44,
+      "start": 1774807200000,
+      "end": 1774836000000,
+      "towers": [
+        "MonkeySub",
+        "SpikeFactory",
+        "DartMonkey",
+        "BananaFarm"
+      ],
+      "start_local": "2026-03-30T02:00:00+08:00",
+      "end_local": "2026-03-30T10:00:00+08:00"
+    },
+    {
+      "index": 45,
+      "start": 1774836000000,
+      "end": 1774864800000,
+      "towers": [
+        "BoomerangMonkey",
+        "EngineerMonkey",
+        "BeastHandler",
+        "DartlingGunner"
+      ],
+      "start_local": "2026-03-30T10:00:00+08:00",
+      "end_local": "2026-03-30T18:00:00+08:00"
+    },
+    {
+      "index": 46,
+      "start": 1774864800000,
+      "end": 1774893600000,
+      "towers": [
+        "GlueGunner",
+        "Desperado",
+        "MonkeyBuccaneer",
+        "Alchemist"
+      ],
+      "start_local": "2026-03-30T18:00:00+08:00",
+      "end_local": "2026-03-31T02:00:00+08:00"
+    },
+    {
+      "index": 47,
+      "start": 1774893600000,
+      "end": 1774922400000,
+      "towers": [
+        "SniperMonkey",
+        "SuperMonkey",
+        "MonkeyAce",
+        "MonkeyVillage"
+      ],
+      "start_local": "2026-03-31T02:00:00+08:00",
+      "end_local": "2026-03-31T10:00:00+08:00"
+    },
+    {
+      "index": 48,
+      "start": 1774922400000,
+      "end": 1774951200000,
+      "towers": [
+        "WizardMonkey",
+        "Druid",
+        "Mermonkey",
+        "IceMonkey"
+      ],
+      "start_local": "2026-03-31T10:00:00+08:00",
+      "end_local": "2026-03-31T18:00:00+08:00"
+    },
+    {
+      "index": 49,
+      "start": 1774951200000,
+      "end": 1774980000000,
+      "towers": [
+        "NinjaMonkey",
+        "BombShooter",
+        "HeliPilot",
+        "TackShooter"
+      ],
+      "start_local": "2026-03-31T18:00:00+08:00",
+      "end_local": "2026-04-01T02:00:00+08:00"
+    },
+    {
+      "index": 50,
+      "start": 1774980000000,
+      "end": 1775008800000,
+      "towers": [
+        "HeliPilot",
+        "TackShooter",
+        "MortarMonkey",
+        "MonkeySub"
+      ],
+      "start_local": "2026-04-01T02:00:00+08:00",
+      "end_local": "2026-04-01T10:00:00+08:00"
+    },
+    {
+      "index": 51,
+      "start": 1775008800000,
+      "end": 1775037600000,
+      "towers": [
+        "SpikeFactory",
+        "DartMonkey",
+        "BananaFarm",
+        "BoomerangMonkey"
+      ],
+      "start_local": "2026-04-01T10:00:00+08:00",
+      "end_local": "2026-04-01T18:00:00+08:00"
+    },
+    {
+      "index": 52,
+      "start": 1775037600000,
+      "end": 1775066400000,
+      "towers": [
+        "EngineerMonkey",
+        "BeastHandler",
+        "DartlingGunner",
+        "GlueGunner"
+      ],
+      "start_local": "2026-04-01T18:00:00+08:00",
+      "end_local": "2026-04-02T02:00:00+08:00"
+    },
+    {
+      "index": 53,
+      "start": 1775066400000,
+      "end": 1775095200000,
+      "towers": [
+        "Desperado",
+        "MonkeyBuccaneer",
+        "Alchemist",
+        "SniperMonkey"
+      ],
+      "start_local": "2026-04-02T02:00:00+08:00",
+      "end_local": "2026-04-02T10:00:00+08:00"
+    },
+    {
+      "index": 54,
+      "start": 1775095200000,
+      "end": 1775124000000,
+      "towers": [
+        "SuperMonkey",
+        "MonkeyAce",
+        "MonkeyVillage",
+        "WizardMonkey"
+      ],
+      "start_local": "2026-04-02T10:00:00+08:00",
+      "end_local": "2026-04-02T18:00:00+08:00"
+    },
+    {
+      "index": 55,
+      "start": 1775124000000,
+      "end": 1775152800000,
+      "towers": [
+        "Druid",
+        "Mermonkey",
+        "IceMonkey",
+        "NinjaMonkey"
+      ],
+      "start_local": "2026-04-02T18:00:00+08:00",
+      "end_local": "2026-04-03T02:00:00+08:00"
+    },
+    {
+      "index": 56,
+      "start": 1775152800000,
+      "end": 1775181600000,
+      "towers": [
+        "BombShooter",
+        "HeliPilot",
+        "TackShooter",
+        "MortarMonkey"
+      ],
+      "start_local": "2026-04-03T02:00:00+08:00",
+      "end_local": "2026-04-03T10:00:00+08:00"
+    },
+    {
+      "index": 57,
+      "start": 1775181600000,
+      "end": 1775210400000,
+      "towers": [
+        "TackShooter",
+        "MortarMonkey",
+        "MonkeySub",
+        "SpikeFactory"
+      ],
+      "start_local": "2026-04-03T10:00:00+08:00",
+      "end_local": "2026-04-03T18:00:00+08:00"
+    },
+    {
+      "index": 58,
+      "start": 1775210400000,
+      "end": 1775239200000,
+      "towers": [
+        "DartMonkey",
+        "BananaFarm",
+        "BoomerangMonkey",
+        "EngineerMonkey"
+      ],
+      "start_local": "2026-04-03T18:00:00+08:00",
+      "end_local": "2026-04-04T02:00:00+08:00"
+    },
+    {
+      "index": 59,
+      "start": 1775239200000,
+      "end": 1775268000000,
+      "towers": [
+        "BeastHandler",
+        "DartlingGunner",
+        "GlueGunner",
+        "Desperado"
+      ],
+      "start_local": "2026-04-04T02:00:00+08:00",
+      "end_local": "2026-04-04T10:00:00+08:00"
+    },
+    {
+      "index": 60,
+      "start": 1775268000000,
+      "end": 1775296800000,
+      "towers": [
+        "MonkeyBuccaneer",
+        "Alchemist",
+        "SniperMonkey",
+        "SuperMonkey"
+      ],
+      "start_local": "2026-04-04T10:00:00+08:00",
+      "end_local": "2026-04-04T18:00:00+08:00"
+    },
+    {
+      "index": 61,
+      "start": 1775296800000,
+      "end": 1775325600000,
+      "towers": [
+        "MonkeyAce",
+        "MonkeyVillage",
+        "WizardMonkey",
+        "Druid"
+      ],
+      "start_local": "2026-04-04T18:00:00+08:00",
+      "end_local": "2026-04-05T02:00:00+08:00"
+    },
+    {
+      "index": 62,
+      "start": 1775325600000,
+      "end": 1775354400000,
+      "towers": [
+        "Mermonkey",
+        "IceMonkey",
+        "NinjaMonkey",
+        "BombShooter"
+      ],
+      "start_local": "2026-04-05T02:00:00+08:00",
+      "end_local": "2026-04-05T10:00:00+08:00"
+    },
+    {
+      "index": 63,
+      "start": 1775354400000,
+      "end": 1775383200000,
+      "towers": [
+        "HeliPilot",
+        "TackShooter",
+        "MortarMonkey",
+        "MonkeySub"
+      ],
+      "start_local": "2026-04-05T10:00:00+08:00",
+      "end_local": "2026-04-05T18:00:00+08:00"
+    },
+    {
+      "index": 64,
+      "start": 1775383200000,
+      "end": 1775412000000,
+      "towers": [
+        "MortarMonkey",
+        "MonkeySub",
+        "SpikeFactory",
+        "DartMonkey"
+      ],
+      "start_local": "2026-04-05T18:00:00+08:00",
+      "end_local": "2026-04-06T02:00:00+08:00"
+    },
+    {
+      "index": 65,
+      "start": 1775412000000,
+      "end": 1775440800000,
+      "towers": [
+        "BananaFarm",
+        "BoomerangMonkey",
+        "EngineerMonkey",
+        "BeastHandler"
+      ],
+      "start_local": "2026-04-06T02:00:00+08:00",
+      "end_local": "2026-04-06T10:00:00+08:00"
+    },
+    {
+      "index": 66,
+      "start": 1775440800000,
+      "end": 1775469600000,
+      "towers": [
+        "DartlingGunner",
+        "GlueGunner",
+        "Desperado",
+        "MonkeyBuccaneer"
+      ],
+      "start_local": "2026-04-06T10:00:00+08:00",
+      "end_local": "2026-04-06T18:00:00+08:00"
+    },
+    {
+      "index": 67,
+      "start": 1775469600000,
+      "end": 1775498400000,
+      "towers": [
+        "Alchemist",
+        "SniperMonkey",
+        "SuperMonkey",
+        "MonkeyAce"
+      ],
+      "start_local": "2026-04-06T18:00:00+08:00",
+      "end_local": "2026-04-07T02:00:00+08:00"
+    },
+    {
+      "index": 68,
+      "start": 1775498400000,
+      "end": 1775527200000,
+      "towers": [
+        "MonkeyVillage",
+        "WizardMonkey",
+        "Druid",
+        "Mermonkey"
+      ],
+      "start_local": "2026-04-07T02:00:00+08:00",
+      "end_local": "2026-04-07T10:00:00+08:00"
+    }
+  ],
+  "display_rotation_count": 3,
+  "display_rotations": [
+    {
+      "index": 66,
+      "start": 1775440800000,
+      "end": 1775469600000,
+      "towers": [
+        "DartlingGunner",
+        "GlueGunner",
+        "Desperado",
+        "MonkeyBuccaneer"
+      ],
+      "is_current": true,
+      "start_local": "2026-04-06T10:00:00+08:00",
+      "end_local": "2026-04-06T18:00:00+08:00",
+      "time_local": "2026/04/06\n10:00"
+    },
+    {
+      "index": 67,
+      "start": 1775469600000,
+      "end": 1775498400000,
+      "towers": [
+        "Alchemist",
+        "SniperMonkey",
+        "SuperMonkey",
+        "MonkeyAce"
+      ],
+      "is_current": false,
+      "start_local": "2026-04-06T18:00:00+08:00",
+      "end_local": "2026-04-07T02:00:00+08:00",
+      "time_local": "2026/04/06\n18:00"
+    },
+    {
+      "index": 68,
+      "start": 1775498400000,
+      "end": 1775527200000,
+      "towers": [
+        "MonkeyVillage",
+        "WizardMonkey",
+        "Druid",
+        "Mermonkey"
+      ],
+      "is_current": false,
+      "start_local": "2026-04-07T02:00:00+08:00",
+      "end_local": "2026-04-07T10:00:00+08:00",
+      "time_local": "2026/04/07\n02:00"
+    }
+  ]
+}

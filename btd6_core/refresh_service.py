@@ -5,6 +5,7 @@ from datetime import datetime
 from pathlib import Path
 
 from api_raw_fetcher import ApiClient
+from btd6_core.collection_event_service import refresh_collection_event_cache
 from btd6_core.update_service import update_all_data
 
 
@@ -33,6 +34,21 @@ def run_refresh_service(
             lines.append(f"[{now}] 刷新完成")
         except Exception as exc:  # noqa: BLE001
             lines.append(f"[{now}] 刷新失败: {exc}")
+
+        try:
+            json_path, _json_text, image_path = refresh_collection_event_cache(client, only_upcoming=False)
+            lines.append(f"[{now}] 收集活动缓存已刷新: {json_path} | {image_path}")
+        except Exception as exc:  # noqa: BLE001
+            lines.append(f"[{now}] 收集活动缓存刷新失败: {exc}")
+
+        try:
+            json_upcoming_path, _json_upcoming_text, image_upcoming_path = refresh_collection_event_cache(
+                client,
+                only_upcoming=True,
+            )
+            lines.append(f"[{now}] 收集活动 upcoming 缓存已刷新: {json_upcoming_path} | {image_upcoming_path}")
+        except Exception as exc:  # noqa: BLE001
+            lines.append(f"[{now}] 收集活动 upcoming 缓存刷新失败: {exc}")
 
         lines.append("")
         cycle_text = "\n".join(lines)

@@ -220,6 +220,7 @@ race/*
 odyssey/*
 daily/*
 out/*
+collection-event/*
 cache_index.json
 summary/
 .vscode/
