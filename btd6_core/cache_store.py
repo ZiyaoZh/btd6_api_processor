@@ -5,14 +5,16 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-INDEX_PATH = Path("cache_index.json")
+INDEX_PATH = Path("output/cache_index.json")
+LEGACY_INDEX_PATH = Path("cache_index.json")
 
 
 def load_index() -> dict[str, Any]:
-    if not INDEX_PATH.exists():
+    path = INDEX_PATH if INDEX_PATH.exists() else LEGACY_INDEX_PATH
+    if not path.exists():
         return {"items": {}}
     try:
-        data = json.loads(INDEX_PATH.read_text(encoding="utf-8"))
+        data = json.loads(path.read_text(encoding="utf-8"))
         if not isinstance(data, dict):
             return {"items": {}}
         if "items" not in data or not isinstance(data["items"], dict):
@@ -23,6 +25,7 @@ def load_index() -> dict[str, Any]:
 
 
 def save_index(index_data: dict[str, Any]) -> None:
+    INDEX_PATH.parent.mkdir(parents=True, exist_ok=True)
     INDEX_PATH.write_text(json.dumps(index_data, ensure_ascii=False, indent=2), encoding="utf-8")
 
 

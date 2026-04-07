@@ -164,7 +164,7 @@ def resolve_detail(client: ApiClient, trans: dict[str, dict[str, str]], detail_t
 
     raw = fetch_raw_data(client)
     event_id, folder, content = build_single_detail_report(client, trans, detail_type, raw)
-    file_path = Path(folder) / f"{event_id}_detail.md"
+    file_path = Path("output") / folder / f"{event_id}_detail.md"
     save_cached_file(file_path, content)
     index_put(index_data, key, event_id, file_path)
     save_index(index_data)

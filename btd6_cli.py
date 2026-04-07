@@ -22,7 +22,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="获取 BTD6 Open Data 并生成详情/排行榜")
     parser.add_argument("--api-key", default=os.getenv("NK_API_KEY"), help="Ninja Kiwi API Key，可选。也可用环境变量 NK_API_KEY")
     parser.add_argument("--translate", default="translate.md", help="翻译表 Markdown 路径")
-    parser.add_argument("--output", default="btd6_digest.md", help="输出文件路径")
+    parser.add_argument("--output", default="output/btd6_digest.md", help="输出文件路径")
     parser.add_argument(
         "--mode",
         choices=["summary", "detail", "leaderboard", "collection-event", "update", "refresh-service"],
@@ -54,12 +54,12 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--collection-event-output",
-        default="collection_event_schedule.json",
+        default="output/collection_event_schedule.json",
         help="collection-event 模式输出的 JSON 文件路径",
     )
     parser.add_argument(
         "--collection-event-image-output",
-        default="collection_event_schedule.png",
+        default="output/collection_event_schedule.png",
         help="collection-event 模式输出的图片路径",
     )
     parser.add_argument(

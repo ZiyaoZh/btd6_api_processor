@@ -44,8 +44,11 @@
 │   ├── update_service.py      # 全量更新流程
 │   └── refresh_service.py     # 定时刷新服务
 ├── translate.md               # 翻译映射表
-├── cache_index.json           # 缓存索引
-├── race/ boss/ odyssey/ daily/# 输出目录（运行时自动创建）
+├── output/                    # 所有输出根目录（运行时自动创建）
+│   ├── cache_index.json       # 缓存索引
+│   ├── summary/               # 简报输出
+│   ├── race/ boss/ odyssey/ daily/ # 详情与排行榜输出
+│   └── collection_event/      # 收集活动缓存输出
 ├── assets/fonts/              # 图片渲染字体缓存
 └── assets/InstaMonkeyIcon/    # collection event 图标资源
 ```
@@ -90,11 +93,11 @@ python btd6_cli.py --help
 
 - `--api-key`：Ninja Kiwi API Key，可选。
 - `--translate`：翻译表路径，默认 `translate.md`。
-- `--output`：主输出文件路径，默认 `btd6_digest.md`。
+- `--output`：主输出文件路径，默认 `output/btd6_digest.md`。
 - `--mode`：模式，可选 `summary` / `detail` / `leaderboard` / `collection-event` / `update` / `refresh-service`。
 - `--refresh-interval-seconds`：refresh-service 刷新间隔，默认 600 秒。
-- `--collection-event-output`：collection-event 模式的 JSON 输出路径，默认 `collection_event_schedule.json`。
-- `--collection-event-image-output`：collection-event 模式的图片输出路径，默认 `collection_event_schedule.png`。
+- `--collection-event-output`：collection-event 模式的 JSON 输出路径，默认 `output/collection_event_schedule.json`。
+- `--collection-event-image-output`：collection-event 模式的图片输出路径，默认 `output/collection_event_schedule.png`。
 - `--only-upcoming`：collection-event 模式仅输出当前和未来轮换。
 
 ### 4.2 summary 模式（只读缓存）
@@ -104,7 +107,7 @@ python btd6_cli.py --help
 ```bash
 python btd6_cli.py \
   --mode summary \
-  --output out/summary.md
+  --output output/summary.md
 ```
 
 ### 4.3 detail 模式（只读缓存）
@@ -120,7 +123,7 @@ python btd6_cli.py \
 python btd6_cli.py \
   --mode detail \
   --detail-types race,boss \
-  --output out/detail.md
+  --output output/detail.md
 ```
 
 说明：
@@ -142,7 +145,7 @@ python btd6_cli.py \
   --mode leaderboard \
   --leaderboard-type race \
   --leaderboard-format markdown \
-  --output out/race_lb.md
+  --output output/race_lb.md
 ```
 
 示例（图片排行榜）：
@@ -152,7 +155,7 @@ python btd6_cli.py \
   --mode leaderboard \
   --leaderboard-type boss-elite \
   --leaderboard-format image \
-  --output out/boss_elite_image_result.md
+  --output output/boss_elite_image_result.md
 ```
 
 说明：
@@ -170,7 +173,7 @@ python btd6_cli.py \
 ```bash
 python btd6_cli.py \
   --mode update \
-  --output out/update.md
+  --output output/update.md
 ```
 
 ### 4.6 collection-event 模式（收集活动轮换）
@@ -180,8 +183,8 @@ python btd6_cli.py \
 ```bash
 python btd6_cli.py \
   --mode collection-event \
-  --collection-event-output out/collection_event_schedule.json \
-  --collection-event-image-output out/collection_event_schedule.png
+  --collection-event-output output/collection_event_schedule.json \
+  --collection-event-image-output output/collection_event_schedule.png
 ```
 
 说明：
@@ -196,7 +199,7 @@ python btd6_cli.py \
 python btd6_cli.py \
   --mode refresh-service \
   --refresh-interval-seconds 600 \
-  --output out/refresh-service.log
+  --output output/refresh-service.log
 ```
 
 ---
@@ -205,26 +208,26 @@ python btd6_cli.py \
 
 ### 5.1 详情输出
 
-- `race/{event_id}_detail.md`
-- `boss/{event_id}_detail.md`
-- `odyssey/{event_id}_detail.md`
-- `daily/{event_id}_detail.md`
+- `output/race/{event_id}_detail.md`
+- `output/boss/{event_id}_detail.md`
+- `output/odyssey/{event_id}_detail.md`
+- `output/daily/{event_id}_detail.md`
 
 ### 5.2 简报输出
 
-- `summary/latest_summary.md`
+- `output/summary/latest_summary.md`
 
 ### 5.3 排行榜输出
 
 Markdown：
-- `race/{event_id}_top100.md`
-- `boss/{event_id}_standard_top150.md`
-- `boss/{event_id}_elite_top150.md`
+- `output/race/{event_id}_top100.md`
+- `output/boss/{event_id}_standard_top150.md`
+- `output/boss/{event_id}_elite_top150.md`
 
 Image：
-- `race/{event_id}_top100.png`
-- `boss/{event_id}_standard_top150.png`
-- `boss/{event_id}_elite_top150.png`
+- `output/race/{event_id}_top100.png`
+- `output/boss/{event_id}_standard_top150.png`
+- `output/boss/{event_id}_elite_top150.png`
 
 ### 5.4 固定人数策略（image）
 
@@ -233,10 +236,10 @@ Image：
 
 ### 5.5 collection-event 缓存输出
 
-- `collection_event/latest_collection_event.json`
-- `collection_event/latest_collection_event.png`
-- `collection_event/latest_collection_event.upcoming.json`
-- `collection_event/latest_collection_event.upcoming.png`
+- `output/collection_event/latest_collection_event.json`
+- `output/collection_event/latest_collection_event.png`
+- `output/collection_event/latest_collection_event.upcoming.json`
+- `output/collection_event/latest_collection_event.upcoming.png`
 
 说明：
 - `collection-event` 模式优先读取对应缓存，缓存缺失时才会生成并写入。
@@ -246,7 +249,7 @@ Image：
 
 ## 6. 缓存机制
 
-缓存索引文件：`cache_index.json`
+缓存索引文件：`output/cache_index.json`
 
 索引结构示例：
 
@@ -255,12 +258,12 @@ Image：
   "items": {
     "detail:race": {
       "id": "race_event_id",
-      "path": "race/race_event_id_detail.md",
+      "path": "output/race/race_event_id_detail.md",
       "updatedAt": "2026-03-24T12:34:56"
     },
     "leaderboard:boss-elite:image-fixed": {
       "id": "boss_event_id",
-      "path": "boss/boss_event_id_elite_top150.png",
+      "path": "output/boss/boss_event_id_elite_top150.png",
       "updatedAt": "2026-03-24T12:35:10"
     }
   }
@@ -420,12 +423,12 @@ report = build_report(client, trans)
 先启动刷新服务，再由业务侧按需读取缓存：
 
 ```bash
-python btd6_cli.py --mode refresh-service --refresh-interval-seconds 600 --output out/refresh.log
-python btd6_cli.py --mode summary --output out/summary.md
-python btd6_cli.py --mode leaderboard --leaderboard-type race --leaderboard-format image --output out/race_image.md
+python btd6_cli.py --mode refresh-service --refresh-interval-seconds 600 --output output/refresh.log
+python btd6_cli.py --mode summary --output output/summary.md
+python btd6_cli.py --mode leaderboard --leaderboard-type race --leaderboard-format image --output output/race_image.md
 ```
 
-你的系统只需读取 `out/*.md` 和活动目录下生成的 `*.png` 即可。
+你的系统只需读取 `output/*.md` 和 `output/` 下活动目录生成的 `*.png` 即可。
 
 ### 10.2 在已有 Python 服务中调用
 

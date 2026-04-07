@@ -51,8 +51,8 @@ FONT_CANDIDATES = [
     FONT_DIR / "LuckiestGuy-Regular.woff2",
     FONT_DIR / "Gardenia-Bold.woff2",
 ]
-DEFAULT_CACHE_JSON_PATH = Path("collection_event/latest_collection_event.json")
-DEFAULT_CACHE_IMAGE_PATH = Path("collection_event/latest_collection_event.png")
+DEFAULT_CACHE_JSON_PATH = Path("output") / "collection_event" / "latest_collection_event.json"
+DEFAULT_CACHE_IMAGE_PATH = Path("output") / "collection_event" / "latest_collection_event.png"
 CACHE_JSON_KEY_PREFIX = "collection-event:json"
 CACHE_IMAGE_KEY_PREFIX = "collection-event:image"
 
