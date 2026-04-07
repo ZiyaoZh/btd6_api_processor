@@ -9,7 +9,8 @@ from urllib import request
 from PIL import Image, ImageDraw, ImageFont
 
 
-LOCAL_FONT_DIR = Path("assets/fonts")
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+LOCAL_FONT_DIR = PROJECT_ROOT / "assets" / "fonts"
 LOCAL_CJK_FONT = LOCAL_FONT_DIR / "NotoSansSC-Regular.otf"
 LOCAL_CJK_FONT_URL = "https://raw.githubusercontent.com/notofonts/noto-cjk/main/Sans/OTF/SimplifiedChinese/NotoSansCJKsc-Regular.otf"
 
