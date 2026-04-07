@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from api_raw_fetcher import ApiClient
-from btd6_core.cache_store import get_cached_content, get_cached_path, index_put, load_index, save_cached_file, save_index
+from btd6_core.cache_store import OUTPUT_DIR, get_cached_content, get_cached_path, index_put, load_index, resolve_project_path, save_cached_file, save_index
 
 EVENTS_URL = "/btd6/events"
 ROTATION_MS = 28_800_000
@@ -51,8 +51,8 @@ FONT_CANDIDATES = [
     FONT_DIR / "LuckiestGuy-Regular.woff2",
     FONT_DIR / "Gardenia-Bold.woff2",
 ]
-DEFAULT_CACHE_JSON_PATH = Path("output") / "collection_event" / "latest_collection_event.json"
-DEFAULT_CACHE_IMAGE_PATH = Path("output") / "collection_event" / "latest_collection_event.png"
+DEFAULT_CACHE_JSON_PATH = OUTPUT_DIR / "collection_event" / "latest_collection_event.json"
+DEFAULT_CACHE_IMAGE_PATH = OUTPUT_DIR / "collection_event" / "latest_collection_event.png"
 CACHE_JSON_KEY_PREFIX = "collection-event:json"
 CACHE_IMAGE_KEY_PREFIX = "collection-event:image"
 
@@ -347,8 +347,9 @@ def draw_schedule_image(display_rotations: list[dict[str, Any]], image_output: P
                     width=2,
                 )
 
-    image_output.parent.mkdir(parents=True, exist_ok=True)
-    img.save(image_output)
+    abs_output = resolve_project_path(image_output)
+    abs_output.parent.mkdir(parents=True, exist_ok=True)
+    img.save(abs_output)
 
 
 def _cache_collection_event(result: dict[str, Any], json_path: Path, image_path: Path, only_upcoming: bool) -> None:

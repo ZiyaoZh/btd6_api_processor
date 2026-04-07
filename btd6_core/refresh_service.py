@@ -5,6 +5,7 @@ from datetime import datetime
 from pathlib import Path
 
 from api_raw_fetcher import ApiClient
+from btd6_core.cache_store import resolve_project_path
 from btd6_core.collection_event_service import refresh_collection_event_cache
 from btd6_core.update_service import update_all_data
 
@@ -21,8 +22,9 @@ def run_refresh_service(
     start_text = f"# 刷新服务已启动\n刷新间隔: {interval_seconds} 秒\n"
     print(start_text, flush=True)
     if log_path is not None:
-        log_path.parent.mkdir(parents=True, exist_ok=True)
-        with log_path.open("a", encoding="utf-8") as fh:
+        log_file = resolve_project_path(log_path)
+        log_file.parent.mkdir(parents=True, exist_ok=True)
+        with log_file.open("a", encoding="utf-8") as fh:
             fh.write(start_text + "\n")
 
     while True:
@@ -54,6 +56,7 @@ def run_refresh_service(
         cycle_text = "\n".join(lines)
         print(cycle_text, flush=True)
         if log_path is not None:
-            with log_path.open("a", encoding="utf-8") as fh:
+            log_file = resolve_project_path(log_path)
+            with log_file.open("a", encoding="utf-8") as fh:
                 fh.write(cycle_text + "\n")
         time.sleep(interval_seconds)

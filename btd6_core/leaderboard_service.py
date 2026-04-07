@@ -5,6 +5,7 @@ from typing import Any
 
 from api_raw_fetcher import ApiClient, fetch_raw_data
 from btd6_core.cache_store import (
+    OUTPUT_DIR,
     get_cached_content,
     get_cached_path,
     index_put,
@@ -272,7 +273,7 @@ def resolve_leaderboard(
             if not _is_no_scores_error(exc):
                 raise
             content = _render_no_scores_markdown(table_data, page)
-        file_path = Path("output") / table_data["folder"] / f"{table_data['event_id']}_{table_data['suffix']}.md"
+        file_path = OUTPUT_DIR / table_data["folder"] / f"{table_data['event_id']}_{table_data['suffix']}.md"
         save_cached_file(file_path, content)
     elif output_format == "image":
         entries: list[dict[str, Any]] = []
@@ -309,7 +310,7 @@ def resolve_leaderboard(
             }
             for item in entries
         ]
-        file_path = Path("output") / table_data["folder"] / f"{table_data['event_id']}_{table_data['suffix']}.png"
+        file_path = OUTPUT_DIR / table_data["folder"] / f"{table_data['event_id']}_{table_data['suffix']}.png"
         render_leaderboard_image(table_data, rendered_entries, image_total_pages, file_path)
         content = ""
     else:

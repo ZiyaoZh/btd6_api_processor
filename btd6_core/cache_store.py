@@ -5,8 +5,24 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-INDEX_PATH = Path("output/cache_index.json")
-LEGACY_INDEX_PATH = Path("cache_index.json")
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+OUTPUT_DIR = PROJECT_ROOT / "output"
+INDEX_PATH = OUTPUT_DIR / "cache_index.json"
+LEGACY_INDEX_PATH = PROJECT_ROOT / "cache_index.json"
+
+
+def resolve_project_path(path: Path) -> Path:
+    if path.is_absolute():
+        return path
+    return PROJECT_ROOT / path
+
+
+def _to_index_path(path: Path) -> str:
+    abs_path = resolve_project_path(path)
+    try:
+        return str(abs_path.relative_to(PROJECT_ROOT))
+    except ValueError:
+        return str(abs_path)
 
 
 def load_index() -> dict[str, Any]:
@@ -30,8 +46,9 @@ def save_index(index_data: dict[str, Any]) -> None:
 
 
 def save_cached_file(path: Path, content: str) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(content, encoding="utf-8")
+    abs_path = resolve_project_path(path)
+    abs_path.parent.mkdir(parents=True, exist_ok=True)
+    abs_path.write_text(content, encoding="utf-8")
 
 
 def get_cached_content(index_data: dict[str, Any], key: str) -> tuple[Path | None, str | None]:
@@ -41,7 +58,7 @@ def get_cached_content(index_data: dict[str, Any], key: str) -> tuple[Path | Non
     raw_path = item.get("path")
     if not raw_path:
         return None, None
-    p = Path(raw_path)
+    p = resolve_project_path(Path(raw_path))
     if not p.exists():
         return None, None
     return p, p.read_text(encoding="utf-8")
@@ -54,7 +71,7 @@ def get_cached_path(index_data: dict[str, Any], key: str) -> Path | None:
     raw_path = item.get("path")
     if not raw_path:
         return None
-    p = Path(raw_path)
+    p = resolve_project_path(Path(raw_path))
     if not p.exists():
         return None
     return p
@@ -64,6 +81,6 @@ def index_put(index_data: dict[str, Any], key: str, record_id: str, path: Path) 
     index_data.setdefault("items", {})
     index_data["items"][key] = {
         "id": record_id,
-        "path": str(path),
+        "path": _to_index_path(path),
         "updatedAt": datetime.now().isoformat(timespec="seconds"),
     }

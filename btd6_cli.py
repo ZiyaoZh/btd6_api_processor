@@ -9,6 +9,7 @@ import sys
 from pathlib import Path
 
 from api_raw_fetcher import ApiClient
+from btd6_core.cache_store import resolve_project_path
 from btd6_core.collection_event_service import resolve_collection_event
 from btd6_core.common import parse_translation_tables
 from btd6_core.detail_service import resolve_detail
@@ -154,7 +155,9 @@ def main() -> int:
         print(f"生成失败: {exc}", file=sys.stderr)
         return 1
 
-    Path(args.output).write_text(report, encoding="utf-8")
+    output_path = resolve_project_path(Path(args.output))
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(report, encoding="utf-8")
     print(f"已生成: {args.output}")
     return 0
 
