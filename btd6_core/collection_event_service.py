@@ -435,11 +435,3 @@ def resolve_collection_event(
     result = build_collection_event_output(client, only_upcoming=only_upcoming)
     _cache_collection_event(result, json_path, image_path, only_upcoming=only_upcoming)
     return json_path, dump_collection_event_output(result), image_path, False
-
-
-def refresh_collection_event_cache(client: ApiClient, only_upcoming: bool = False) -> tuple[Path, str, Path]:
-    result = build_collection_event_output(client, only_upcoming=only_upcoming)
-    json_path = _cache_json_path(only_upcoming)
-    image_path = _cache_image_path(only_upcoming)
-    _cache_collection_event(result, json_path, image_path, only_upcoming=only_upcoming)
-    return json_path, dump_collection_event_output(result), image_path

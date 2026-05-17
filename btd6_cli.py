@@ -14,7 +14,6 @@ from btd6_core.collection_event_service import resolve_collection_event
 from btd6_core.common import parse_translation_tables
 from btd6_core.detail_service import resolve_detail
 from btd6_core.leaderboard_service import resolve_leaderboard
-from btd6_core.refresh_service import run_refresh_service
 from btd6_core.summary_service import resolve_summary
 from btd6_core.update_service import update_all_data
 
@@ -26,9 +25,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output", default="output/btd6_digest.md", help="输出文件路径")
     parser.add_argument(
         "--mode",
-        choices=["summary", "detail", "leaderboard", "collection-event", "update", "refresh-service"],
+        choices=["summary", "detail", "leaderboard", "collection-event", "update"],
         default="summary",
-        help="输出模式：summary=简报(缓存)，detail=最新一期详细信息(缓存)，leaderboard=排行榜(缓存)，collection-event=收集活动轮换，update=更新所有数据，refresh-service=定时刷新服务",
+        help="输出模式：summary=简报，detail=最新一期详细信息，leaderboard=排行榜，collection-event=收集活动轮换，update=手动更新所有数据",
     )
     parser.add_argument(
         "--detail-types",
@@ -46,12 +45,6 @@ def parse_args() -> argparse.Namespace:
         choices=["markdown", "image"],
         default="markdown",
         help="leaderboard 输出格式：markdown 或 image（仅玩家和得分）",
-    )
-    parser.add_argument(
-        "--refresh-interval-seconds",
-        type=int,
-        default=600,
-        help="refresh-service 模式刷新间隔秒数，默认 600（10 分钟）",
     )
     parser.add_argument(
         "--collection-event-output",
@@ -139,17 +132,8 @@ def main() -> int:
         elif args.mode == "update":
             report = update_all_data(client, trans)
 
-        else:
-            run_refresh_service(
-                client,
-                trans,
-                interval_seconds=args.refresh_interval_seconds,
-                log_path=Path(args.output),
-            )
-            return 0
-
     except KeyboardInterrupt:
-        print("刷新服务已停止", file=sys.stderr)
+        print("操作已停止", file=sys.stderr)
         return 0
     except Exception as exc:  # noqa: BLE001
         print(f"生成失败: {exc}", file=sys.stderr)

@@ -102,7 +102,6 @@ def resolve_summary(client: ApiClient, trans: dict[str, dict[str, str]], refresh
         cached_path, cached_content = get_cached_content(index_data, key)
         if cached_path and cached_content is not None:
             return cached_path, cached_content, True
-        raise RuntimeError("未找到 summary 缓存，请先运行 refresh-service 刷新数据")
 
     content = build_report(client, trans)
     file_path = Path("output") / "summary" / "latest_summary.md"

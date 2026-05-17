@@ -20,11 +20,10 @@
   - markdown 文本榜单
   - image 图片榜单（适合社群转发）
 - 支持翻译表（translate.md）做中文化映射。
-- 支持缓存只读查询 + 独立刷新服务策略。
+- 支持 10 分钟 TTL 缓存，普通查询优先命中缓存，未命中或过期时按需回源。
 - 支持一键全量更新（update）。
-- 支持定时刷新服务（默认每 10 分钟）。
 - 支持 collection event 轮换表与图片导出。
-- 支持 collection event 缓存读取，并接入现有 refresh-service 的 10 分钟刷新节奏。
+- 支持 collection event 缓存读取与按需回源。
 
 ---
 
@@ -43,8 +42,7 @@
 │   ├── detail_service.py      # 详情生成
 │   ├── leaderboard_service.py # 排行榜生成
 │   ├── image_renderer.py      # PNG 排行榜渲染
-│   ├── update_service.py      # 全量更新流程
-│   └── refresh_service.py     # 定时刷新服务
+│   └── update_service.py      # 全量更新流程
 ├── translate.md               # 翻译映射表
 ├── output/                    # 所有输出根目录（运行时自动创建）
 │   ├── cache_index.json       # 缓存索引
@@ -96,13 +94,12 @@ python btd6_cli.py --help
 - `--api-key`：Ninja Kiwi API Key，可选。
 - `--translate`：翻译表路径，默认 `translate.md`。
 - `--output`：主输出文件路径，默认 `output/btd6_digest.md`。
-- `--mode`：模式，可选 `summary` / `detail` / `leaderboard` / `collection-event` / `update` / `refresh-service`。
-- `--refresh-interval-seconds`：refresh-service 刷新间隔，默认 600 秒。
+- `--mode`：模式，可选 `summary` / `detail` / `leaderboard` / `collection-event` / `update`。
 - `--collection-event-output`：collection-event 模式的 JSON 输出路径，默认 `output/collection_event_schedule.json`。
 - `--collection-event-image-output`：collection-event 模式的图片输出路径，默认 `output/collection_event_schedule.png`。
 - `--only-upcoming`：collection-event 模式仅输出当前和未来轮换。
 
-### 4.2 summary 模式（只读缓存）
+### 4.2 summary 模式（按需缓存）
 
 生成当前活动简报（Race/Boss/Odyssey/Daily）。
 
@@ -112,7 +109,7 @@ python btd6_cli.py \
   --output output/summary.md
 ```
 
-### 4.3 detail 模式（只读缓存）
+### 4.3 detail 模式（按需缓存）
 
 生成指定活动类型的“最新一期详细信息”。
 
@@ -132,7 +129,7 @@ python btd6_cli.py \
 - 若只传一个类型，输出该类型详情。
 - 若传多个类型，主输出会包含每个类型的文件路径和合并内容。
 
-### 4.4 leaderboard 模式（只读缓存）
+### 4.4 leaderboard 模式（按需缓存）
 
 生成排行榜（当前实现固定从第一页起拉取，内部按类型取固定人数）。
 
@@ -180,7 +177,7 @@ python btd6_cli.py \
 
 ### 4.6 collection-event 模式（收集活动轮换）
 
-生成 collection event 的轮换 JSON 与图片。会优先读取缓存中的 JSON 和图片；如果缓存不存在，才会现场生成并写入缓存。图片图标默认读取 `assets/InstaMonkeyIcon/`，字体优先使用 `assets/fonts/Gardenia-Bold.woff2`，其次会按 `assets/fonts/` 下的其他本地字体回退。
+生成 collection event 的轮换 JSON 与图片。会优先读取缓存中的 JSON 和图片；如果缓存不存在或已过期，才会现场生成并写入缓存。图片图标默认读取 `assets/InstaMonkeyIcon/`，字体优先使用 `assets/fonts/Gardenia-Bold.woff2`，其次会按 `assets/fonts/` 下的其他本地字体回退。
 
 ```bash
 python btd6_cli.py \
@@ -191,18 +188,7 @@ python btd6_cli.py \
 
 说明：
 - `--only-upcoming` 仅保留当前和未来轮换。
-- collection event 的缓存刷新已经并入 `refresh-service`，默认每 10 分钟刷新一次。
-
-### 4.7 refresh-service 模式（定时刷新）
-
-启动常驻刷新服务，默认每 10 分钟刷新一次全部数据。
-
-```bash
-python btd6_cli.py \
-  --mode refresh-service \
-  --refresh-interval-seconds 600 \
-  --output output/refresh-service.log
-```
+- 缓存 TTL 为 10 分钟，超过后会自动重新获取并覆盖缓存。
 
 ---
 
@@ -244,8 +230,7 @@ Image：
 - `output/collection_event/latest_collection_event.upcoming.png`
 
 说明：
-- `collection-event` 模式优先读取对应缓存，缓存缺失时才会生成并写入。
-- `collection-event` 的缓存刷新已经并入 `refresh-service`，默认每 10 分钟刷新一次。
+- `collection-event` 模式优先读取对应缓存，缓存缺失或过期时会重新生成并写入。
 
 ---
 
@@ -261,21 +246,25 @@ Image：
     "detail:race": {
       "id": "race_event_id",
       "path": "output/race/race_event_id_detail.md",
-      "updatedAt": "2026-03-24T12:34:56"
+      "updatedAt": "2026-03-24T12:34:56+08:00",
+      "updatedAtEpoch": 1774326896,
+      "ttlSeconds": 600
     },
     "leaderboard:boss-elite:image-fixed": {
       "id": "boss_event_id",
       "path": "output/boss/boss_event_id_elite_top150.png",
-      "updatedAt": "2026-03-24T12:35:10"
+      "updatedAt": "2026-03-24T12:35:10+08:00",
+      "updatedAtEpoch": 1774326910,
+      "ttlSeconds": 600
     }
   }
 }
 ```
 
 读取逻辑：
-- `summary` / `detail` / `leaderboard` 模式只读取缓存文件。
-- 缓存不存在时会报错提示先执行 `update` 或 `refresh-service`。
-- 远程刷新仅由 `update` 与 `refresh-service` 负责。
+- `summary` / `detail` / `leaderboard` / `collection-event` 模式优先读取缓存文件。
+- 缓存不存在或超过 10 分钟 TTL 时，会自动请求远程并覆盖缓存。
+- `update` 会强制回源并刷新全部缓存。
 
 ---
 
@@ -313,6 +302,9 @@ print(raw.keys())  # dict_keys(['races', 'bosses', 'odyssey', 'daily'])
 - `build_report(client, trans) -> str`
 - `resolve_summary(client, trans, refresh=False) -> tuple[path, content, cached]`
 
+说明：
+- `refresh=False` 时优先读缓存；缓存不存在或过期时会主动请求远程。
+
 示例：
 
 ```python
@@ -341,7 +333,7 @@ report = build_report(client, trans)
 - `cached`：是否来自缓存
 
 说明：
-- `refresh=False` 时只读缓存，不会主动请求远程。
+- `refresh=False` 时优先读缓存；缓存不存在或过期时会主动请求远程。
 
 ### 7.4 排行榜服务
 
@@ -360,7 +352,7 @@ report = build_report(client, trans)
 - `cached`：是否来自缓存
 
 说明：
-- `refresh=False` 时只读缓存，不会主动请求远程。
+- `refresh=False` 时优先读缓存；缓存不存在或过期时会主动请求远程。
 
 ### 7.5 更新服务
 
@@ -368,13 +360,7 @@ report = build_report(client, trans)
 
 - `update_all_data(client, trans) -> str`
 
-用于批量刷新 summary、所有详情和排行榜（默认第一页基准 + 固定人数策略）。
-
-文件：`btd6_core/refresh_service.py`
-
-- `run_refresh_service(client, trans, interval_seconds=600, log_path=None) -> None`
-
-用于常驻定时刷新服务。
+用于批量刷新 summary、所有详情、排行榜和 collection event 缓存。
 
 ---
 
@@ -422,10 +408,10 @@ report = build_report(client, trans)
 
 ### 10.1 作为定时任务
 
-先启动刷新服务，再由业务侧按需读取缓存：
+业务侧可以直接调用查询命令，缓存有效期为 10 分钟；如果希望提前预热，也可以单独跑一次 `update`：
 
 ```bash
-python btd6_cli.py --mode refresh-service --refresh-interval-seconds 600 --output output/refresh.log
+python btd6_cli.py --mode update --output output/update.md
 python btd6_cli.py --mode summary --output output/summary.md
 python btd6_cli.py --mode leaderboard --leaderboard-type race --leaderboard-format image --output output/race_image.md
 ```
@@ -456,7 +442,7 @@ payload = {
 ## 11. 错误处理建议
 
 - 网络波动：已内置重试与退避；若业务侧严格 SLA，建议外层再包一层任务重试。
-- 缓存文件缺失：查询命令会报错，请先执行 `update` 或 `refresh-service`。
+- 缓存文件缺失或过期：查询命令会自动回源并刷新缓存。
 - API 失败：`ApiClient.get` 会抛出 `RuntimeError`，上层应记录日志并告警。
 
 ---

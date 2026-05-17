@@ -160,7 +160,6 @@ def resolve_detail(client: ApiClient, trans: dict[str, dict[str, str]], detail_t
         cached_path, cached_content = get_cached_content(index_data, key)
         if cached_path and cached_content is not None:
             return cached_path, cached_content, True
-        raise RuntimeError(f"未找到 {detail_type} 详情缓存，请先运行 refresh-service 刷新数据")
 
     raw = fetch_raw_data(client)
     event_id, folder, content = build_single_detail_report(client, trans, detail_type, raw)
