@@ -431,7 +431,14 @@ def resolve_collection_event(
         cached_image_path = get_cached_path(index_data, image_key)
         if cached_json_path and cached_json_content is not None and cached_image_path:
             return cached_json_path, cached_json_content, cached_image_path, True
+    stale_json_path, stale_json_content = get_cached_content(index_data, json_key, allow_stale=True)
+    stale_image_path = get_cached_path(index_data, image_key, allow_stale=True)
 
-    result = build_collection_event_output(client, only_upcoming=only_upcoming)
-    _cache_collection_event(result, json_path, image_path, only_upcoming=only_upcoming)
-    return json_path, dump_collection_event_output(result), image_path, False
+    try:
+        result = build_collection_event_output(client, only_upcoming=only_upcoming)
+        _cache_collection_event(result, json_path, image_path, only_upcoming=only_upcoming)
+        return json_path, dump_collection_event_output(result), image_path, False
+    except Exception as exc:  # noqa: BLE001
+        if stale_json_path and stale_json_content is not None and stale_image_path:
+            return stale_json_path, stale_json_content, stale_image_path, True
+        raise RuntimeError(f"collection-event 刷新失败且无可用缓存: {exc}") from exc

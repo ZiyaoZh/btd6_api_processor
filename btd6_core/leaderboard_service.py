@@ -260,60 +260,74 @@ def resolve_leaderboard(
             cached_path = get_cached_path(index_data, key)
             if cached_path:
                 return cached_path, "", True
-
-    raw = fetch_raw_data(client)
-    table_data = build_single_leaderboard_table_data(leaderboard_type, page, raw)
+    stale_content_path = None
+    stale_content = None
+    stale_image_path = None
     if output_format == "markdown":
-        try:
-            payload = client.get(append_page(table_data["board_url"], page))
-            content = render_markdown_report(table_data, payload)
-        except RuntimeError as exc:
-            if not _is_no_scores_error(exc):
-                raise
-            content = _render_no_scores_markdown(table_data, page)
-        file_path = OUTPUT_DIR / table_data["folder"] / f"{table_data['event_id']}_{table_data['suffix']}.md"
-        save_cached_file(file_path, content)
-    elif output_format == "image":
-        entries: list[dict[str, Any]] = []
-        image_total_pages = 1
-        try:
-            if table_data.get("is_boss"):
-                # Boss 每页 25 条，固定尝试拉取前 6 页，最多 150 人。
-                payload_1 = client.get(append_page(table_data["board_url"], 1))
-                api_max_pages = int(payload_1.get("maxPages", 1) or 1)
-                entries = list(payload_1.get("body", []))
-                for p in range(2, min(api_max_pages, 6) + 1):
-                    payload_p = client.get(append_page(table_data["board_url"], p))
-                    entries.extend(list(payload_p.get("body", [])))
-                entries = entries[:150]
-                image_total_pages = 1
-            else:
-                # 竞速固定前 100 人：第一页和第二页。
-                payload_1 = client.get(append_page(table_data["board_url"], 1))
-                payload_2 = client.get(append_page(table_data["board_url"], 2))
-                entries = list(payload_1.get("body", [])) + list(payload_2.get("body", []))
-                entries = entries[:100]
-                image_total_pages = 1
-        except RuntimeError as exc:
-            if not _is_no_scores_error(exc):
-                raise
-            table_data["total_submissions"] = 0
-
-        rendered_entries = [
-            {
-                "displayName": item.get("displayName", "Unknown"),
-                "displayScore": _build_boss_score_from_parts(item)
-                if table_data.get("is_boss")
-                else _format_score_value(item.get("score", "?"), table_data.get("scoring_type", "GameTime")),
-            }
-            for item in entries
-        ]
-        file_path = OUTPUT_DIR / table_data["folder"] / f"{table_data['event_id']}_{table_data['suffix']}.png"
-        render_leaderboard_image(table_data, rendered_entries, image_total_pages, file_path)
-        content = ""
+        stale_content_path, stale_content = get_cached_content(index_data, key, allow_stale=True)
     else:
-        raise ValueError(f"不支持的排行榜输出格式: {output_format}")
+        stale_image_path = get_cached_path(index_data, key, allow_stale=True)
 
-    index_put(index_data, key, table_data["event_id"], file_path)
-    save_index(index_data)
-    return file_path, content, False
+        try:
+            raw = fetch_raw_data(client)
+            table_data = build_single_leaderboard_table_data(leaderboard_type, page, raw)
+            if output_format == "markdown":
+                try:
+                    payload = client.get(append_page(table_data["board_url"], page))
+                    content = render_markdown_report(table_data, payload)
+                except RuntimeError as exc:
+                    if not _is_no_scores_error(exc):
+                        raise
+                    content = _render_no_scores_markdown(table_data, page)
+                file_path = OUTPUT_DIR / table_data["folder"] / f"{table_data['event_id']}_{table_data['suffix']}.md"
+                save_cached_file(file_path, content)
+            elif output_format == "image":
+                entries: list[dict[str, Any]] = []
+                image_total_pages = 1
+                try:
+                    if table_data.get("is_boss"):
+                        # Boss 每页 25 条，固定尝试拉取前 6 页，最多 150 人。
+                        payload_1 = client.get(append_page(table_data["board_url"], 1))
+                        api_max_pages = int(payload_1.get("maxPages", 1) or 1)
+                        entries = list(payload_1.get("body", []))
+                        for p in range(2, min(api_max_pages, 6) + 1):
+                            payload_p = client.get(append_page(table_data["board_url"], p))
+                            entries.extend(list(payload_p.get("body", [])))
+                        entries = entries[:150]
+                        image_total_pages = 1
+                    else:
+                        # 竞速固定前 100 人：第一页和第二页。
+                        payload_1 = client.get(append_page(table_data["board_url"], 1))
+                        payload_2 = client.get(append_page(table_data["board_url"], 2))
+                        entries = list(payload_1.get("body", [])) + list(payload_2.get("body", []))
+                        entries = entries[:100]
+                        image_total_pages = 1
+                except RuntimeError as exc:
+                    if not _is_no_scores_error(exc):
+                        raise
+                    table_data["total_submissions"] = 0
+
+                rendered_entries = [
+                    {
+                        "displayName": item.get("displayName", "Unknown"),
+                        "displayScore": _build_boss_score_from_parts(item)
+                        if table_data.get("is_boss")
+                        else _format_score_value(item.get("score", "?"), table_data.get("scoring_type", "GameTime")),
+                    }
+                    for item in entries
+                ]
+                file_path = OUTPUT_DIR / table_data["folder"] / f"{table_data['event_id']}_{table_data['suffix']}.png"
+                render_leaderboard_image(table_data, rendered_entries, image_total_pages, file_path)
+                content = ""
+            else:
+                raise ValueError(f"不支持的排行榜输出格式: {output_format}")
+
+            index_put(index_data, key, table_data["event_id"], file_path)
+            save_index(index_data)
+            return file_path, content, False
+        except Exception as exc:  # noqa: BLE001
+            if stale_content_path and stale_content is not None:
+                return stale_content_path, stale_content, True
+            if stale_image_path:
+                return stale_image_path, "", True
+            raise RuntimeError(f"{leaderboard_type} 排行榜刷新失败且无可用缓存: {exc}") from exc

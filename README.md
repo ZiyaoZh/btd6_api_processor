@@ -264,6 +264,7 @@ Image：
 读取逻辑：
 - `summary` / `detail` / `leaderboard` / `collection-event` 模式优先读取缓存文件。
 - 缓存不存在或超过 10 分钟 TTL 时，会自动请求远程并覆盖缓存。
+- 如果远程请求失败且本地仍有旧缓存，会自动回退到旧缓存继续服务。
 - `update` 会强制回源并刷新全部缓存。
 
 ---
@@ -276,13 +277,14 @@ Image：
 
 文件：`api_raw_fetcher.py`
 
-- `ApiClient(api_key: str | None = None, timeout: int = 30, retries: int = 5)`
+- `ApiClient(api_key: str | None = None, timeout: int = 45, retries: int = 2)`
 - `ApiClient.get(path_or_url: str) -> dict`
 - `fetch_raw_data(client: ApiClient) -> dict`
 
 说明：
 - `get` 支持传完整 URL 或相对路径。
 - 内置重试与指数退避。
+- 超时和 HTTP 错误会被格式化成更清晰的错误文本，例如 `读取超时（45s）`、`HTTP 503 Service Unavailable`。
 - 统一期望 Open Data 返回格式：`{ success, error, body }`。
 
 示例：
@@ -304,6 +306,7 @@ print(raw.keys())  # dict_keys(['races', 'bosses', 'odyssey', 'daily'])
 
 说明：
 - `refresh=False` 时优先读缓存；缓存不存在或过期时会主动请求远程。
+- 如果远程请求失败且本地仍有旧缓存，会自动回退到旧缓存。
 
 示例：
 
@@ -334,6 +337,7 @@ report = build_report(client, trans)
 
 说明：
 - `refresh=False` 时优先读缓存；缓存不存在或过期时会主动请求远程。
+- 如果远程请求失败且本地仍有旧缓存，会自动回退到旧缓存。
 
 ### 7.4 排行榜服务
 
@@ -353,6 +357,7 @@ report = build_report(client, trans)
 
 说明：
 - `refresh=False` 时优先读缓存；缓存不存在或过期时会主动请求远程。
+- 如果远程请求失败且本地仍有旧缓存，会自动回退到旧缓存。
 
 ### 7.5 更新服务
 
@@ -361,6 +366,7 @@ report = build_report(client, trans)
 - `update_all_data(client, trans) -> str`
 
 用于批量刷新 summary、所有详情、排行榜和 collection event 缓存。
+如果官方 API 刷新失败但本地仍有旧缓存，结果文本会明确标记为“已回退旧缓存”。
 
 ---
 
@@ -443,6 +449,7 @@ payload = {
 
 - 网络波动：已内置重试与退避；若业务侧严格 SLA，建议外层再包一层任务重试。
 - 缓存文件缺失或过期：查询命令会自动回源并刷新缓存。
+- API 失败但存在旧缓存：查询命令会自动回退旧缓存，不会直接中断。
 - API 失败：`ApiClient.get` 会抛出 `RuntimeError`，上层应记录日志并告警。
 
 ---

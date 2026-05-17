@@ -81,11 +81,12 @@ def get_cached_content(
     index_data: dict[str, Any],
     key: str,
     ttl_seconds: int = CACHE_TTL_SECONDS,
+    allow_stale: bool = False,
 ) -> tuple[Path | None, str | None]:
     item = index_data.get("items", {}).get(key)
     if not isinstance(item, dict):
         return None, None
-    if not _is_cache_fresh(item, ttl_seconds=ttl_seconds):
+    if not allow_stale and not _is_cache_fresh(item, ttl_seconds=ttl_seconds):
         return None, None
     raw_path = item.get("path")
     if not raw_path:
@@ -96,11 +97,16 @@ def get_cached_content(
     return p, p.read_text(encoding="utf-8")
 
 
-def get_cached_path(index_data: dict[str, Any], key: str, ttl_seconds: int = CACHE_TTL_SECONDS) -> Path | None:
+def get_cached_path(
+    index_data: dict[str, Any],
+    key: str,
+    ttl_seconds: int = CACHE_TTL_SECONDS,
+    allow_stale: bool = False,
+) -> Path | None:
     item = index_data.get("items", {}).get(key)
     if not isinstance(item, dict):
         return None
-    if not _is_cache_fresh(item, ttl_seconds=ttl_seconds):
+    if not allow_stale and not _is_cache_fresh(item, ttl_seconds=ttl_seconds):
         return None
     raw_path = item.get("path")
     if not raw_path:
