@@ -4,7 +4,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from api_raw_fetcher import ApiClient, fetch_raw_data
+from api_raw_fetcher import ApiClient, fetch_bosses, fetch_daily_challenges, fetch_odyssey, fetch_races
 from btd6_core.cache_store import get_cached_content, index_put, load_index, save_cached_file, save_index
 from btd6_core.common import (
     challenge_doc_detail,
@@ -48,6 +48,18 @@ def get_latest_event(raw: dict[str, Any], detail_type: str) -> dict[str, Any] | 
     if detail_type == "daily":
         return events[0] if events else None
     return _pick_latest_by_start(events)
+
+
+def fetch_detail_raw_data(client: ApiClient, detail_type: str) -> dict[str, Any]:
+    if detail_type == "race":
+        return {"races": fetch_races(client)}
+    if detail_type == "boss":
+        return {"bosses": fetch_bosses(client)}
+    if detail_type == "odyssey":
+        return {"odyssey": fetch_odyssey(client)}
+    if detail_type == "daily":
+        return {"daily": fetch_daily_challenges(client)}
+    raise ValueError(f"不支持的 detail 类型: {detail_type}")
 
 
 def build_single_detail_report(client: ApiClient, trans: dict[str, dict[str, str]], detail_type: str, raw: dict[str, Any]) -> tuple[str, str, str]:
@@ -163,7 +175,7 @@ def resolve_detail(client: ApiClient, trans: dict[str, dict[str, str]], detail_t
     stale_path, stale_content = get_cached_content(index_data, key, allow_stale=True)
 
     try:
-        raw = fetch_raw_data(client)
+        raw = fetch_detail_raw_data(client, detail_type)
         event_id, folder, content = build_single_detail_report(client, trans, detail_type, raw)
         file_path = Path("output") / folder / f"{event_id}_detail.md"
         save_cached_file(file_path, content)

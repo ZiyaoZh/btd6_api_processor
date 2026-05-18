@@ -11,6 +11,10 @@ from typing import Any
 from urllib import error, request
 
 API_BASE = "https://data.ninjakiwi.com"
+RACES_URL = "/btd6/races"
+BOSSES_URL = "/btd6/bosses"
+ODYSSEY_URL = "/btd6/odyssey"
+DAILY_URL = "/btd6/challenges/filter/daily"
 
 
 @dataclass
@@ -63,12 +67,28 @@ class ApiClient:
         raise RuntimeError(f"请求失败: {url}; 错误: {formatted_error}")
 
 
+def fetch_races(client: ApiClient) -> list[dict[str, Any]]:
+    return client.get(RACES_URL).get("body", [])
+
+
+def fetch_bosses(client: ApiClient) -> list[dict[str, Any]]:
+    return client.get(BOSSES_URL).get("body", [])
+
+
+def fetch_odyssey(client: ApiClient) -> list[dict[str, Any]]:
+    return client.get(ODYSSEY_URL).get("body", [])
+
+
+def fetch_daily_challenges(client: ApiClient) -> list[dict[str, Any]]:
+    return client.get(DAILY_URL).get("body", [])
+
+
 def fetch_raw_data(client: ApiClient) -> dict[str, Any]:
     """获取项目所需的所有原始数据，不做业务加工。"""
-    races = client.get("/btd6/races").get("body", [])
-    bosses = client.get("/btd6/bosses").get("body", [])
-    odyssey = client.get("/btd6/odyssey").get("body", [])
-    daily = client.get("/btd6/challenges/filter/daily").get("body", [])
+    races = fetch_races(client)
+    bosses = fetch_bosses(client)
+    odyssey = fetch_odyssey(client)
+    daily = fetch_daily_challenges(client)
 
     return {
         "races": races,

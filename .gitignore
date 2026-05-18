@@ -224,3 +224,4 @@ collection-event/*
 cache_index.json
 summary/
 .vscode/
+output/*
