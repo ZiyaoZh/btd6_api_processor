@@ -9,15 +9,20 @@ from pathlib import Path
 from typing import Any
 from unittest.mock import patch
 
-from PIL import Image, ImageStat
+from PIL import Image, ImageDraw, ImageStat
 
+from btd6_core.activity_brief_service import resolve_activity_brief
 from btd6_core.activity_formatter import (
     challenge_limit_label,
     format_activity_snapshot,
     format_activity_time,
 )
 from btd6_core.activity_models import ActivityAsset, BloonModifiers
-from btd6_core.activity_renderer import render_activity_brief
+from btd6_core.activity_renderer import (
+    _draw_text_in_rect,
+    _paste_map,
+    render_activity_brief,
+)
 from btd6_core.activity_repository import (
     ActivityRepository,
     MapAssetCache,
@@ -25,6 +30,7 @@ from btd6_core.activity_repository import (
     select_event,
 )
 from btd6_core.common import parse_translation_tables
+from btd6_core.image_renderer import _load_font
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -277,7 +283,7 @@ class ActivityPipelineTests(unittest.TestCase):
         ).fetch_snapshot("daily", event_scope="latest")
 
         self.assertEqual(snapshot.event_id, "valid")
-        self.assertEqual(snapshot.status, "unknown")
+        self.assertEqual(snapshot.status, "current")
         self.assertIsNone(snapshot.start_at)
         self.assertEqual(snapshot.attributes["created_at"], 100)
         self.assertEqual(client.calls[-2:], ["https://example.test/broken", "https://example.test/valid"])
@@ -342,12 +348,48 @@ class ActivityPipelineTests(unittest.TestCase):
 
             race_a = root / "race_a.png"
             race_b = root / "race_b.png"
+            boss_path = root / "boss.png"
             odyssey_path = root / "odyssey.png"
+            daily_path = root / "daily.png"
             odyssey_base_path = root / "odyssey_base.png"
             odyssey_rules_path = root / "odyssey_rules.png"
+            standard = replace(race.challenges[0], label="standard")
+            elite = replace(
+                race.challenges[0],
+                label="elite",
+                bloon_modifiers=BloonModifiers(boss_health=1.5, boss_speed=1.2),
+            )
+            boss = replace(
+                race,
+                activity_type="boss",
+                event_id="Vortex46_fixture",
+                name="Vortex46",
+                score_counts={"standard": 2917, "elite": 1374},
+                attributes={
+                    "boss_type_name": "漩涡",
+                    "normal_scoring_type": "GameTime",
+                    "elite_scoring_type": "LeastTiers",
+                },
+                challenges=(standard, elite),
+            )
+            daily_challenge = replace(race.challenges[0], label="daily")
+            daily = replace(
+                race,
+                activity_type="daily",
+                event_id="rot2915_fixture",
+                name="Standard 2915: Fixture Challenge",
+                start_at=None,
+                end_at=None,
+                status="unknown",
+                score_counts={},
+                attributes={"created_at": 1785856303887},
+                challenges=(daily_challenge,),
+            )
             render_activity_brief(race, race_a)
             render_activity_brief(race, race_b)
+            render_activity_brief(boss, boss_path)
             render_activity_brief(odyssey, odyssey_path)
+            render_activity_brief(daily, daily_path)
 
             assert odyssey.odyssey is not None
             base_map = odyssey.odyssey.maps[0]
@@ -393,10 +435,118 @@ class ActivityPipelineTests(unittest.TestCase):
                 self.assertEqual(image.width, 1080)
                 self.assertGreater(image.height, 2000)
                 self.assertGreater(sum(ImageStat.Stat(image).var), 100)
+            with Image.open(boss_path) as image:
+                self.assertEqual(image.width, 1080)
+                self.assertGreater(image.height, 1800)
+                self.assertGreater(sum(ImageStat.Stat(image).var), 100)
+            with Image.open(daily_path) as image:
+                self.assertEqual(image.width, 1080)
+                self.assertGreater(image.height, 900)
+                self.assertGreater(sum(ImageStat.Stat(image).var), 100)
             with Image.open(odyssey_base_path) as base_image, Image.open(
                 odyssey_rules_path
             ) as rules_image:
                 self.assertGreater(rules_image.height, base_image.height)
+
+    def test_map_viewport_covers_landscape_box_without_side_gutters(self) -> None:
+        fixture = _fixture("race_end_of_line.json")
+        event = fixture["list_response"]["body"][0]
+        snapshot = ActivityRepository(
+            _race_client(),  # type: ignore[arg-type]
+            TRANSLATIONS,
+            asset_fetcher=StaticAssetFetcher(),
+            now_ms=event["start"] + 1,
+        ).fetch_snapshot("race", event_scope="current")
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            asset = Path(temp_dir) / "square-map.png"
+            source = Image.new("RGB", (510, 510), "#35a76f")
+            source.paste(Image.new("RGB", (510, 70), "#d94b4b"), (0, 0))
+            source.paste(Image.new("RGB", (510, 70), "#3f75cf"), (0, 440))
+            source.paste(Image.new("RGB", (240, 240), "#f3c544"), (135, 135))
+            source.save(asset)
+            challenge = replace(
+                snapshot.challenges[0],
+                map_asset=ActivityAsset(local_path=str(asset), status="ready"),
+            )
+            target = Image.new("RGB", (430, 250), "#05080a")
+            draw = ImageDraw.Draw(target)
+            _paste_map(target, draw, challenge, (20, 20, 392, 230), _load_font(20))
+
+        self.assertEqual(target.getpixel((25, 125)), (53, 167, 111))
+        self.assertEqual(target.getpixel((206, 125)), (243, 197, 68))
+        self.assertEqual(target.getpixel((206, 26)), (217, 75, 75))
+        self.assertEqual(target.getpixel((206, 224)), (63, 117, 207))
+
+    def test_text_rect_helper_centers_actual_glyph_bounds(self) -> None:
+        image = Image.new("RGB", (320, 100), "#11151a")
+        draw = ImageDraw.Draw(image)
+        rect = (20, 20, 300, 62)
+        ink = _draw_text_in_rect(
+            draw,
+            rect,
+            "国Agyp  x1.25",
+            font=_load_font(22),
+            fill="#ffffff",
+            align="center",
+        )
+
+        top_padding = ink[1] - rect[1]
+        bottom_padding = rect[3] - ink[3]
+        self.assertGreaterEqual(top_padding, 5)
+        self.assertGreaterEqual(bottom_padding, 5)
+        self.assertLessEqual(abs(top_padding - bottom_padding), 1)
+
+    def test_brief_render_version_invalidates_legacy_cached_image(self) -> None:
+        fixture = _fixture("race_end_of_line.json")
+        event = fixture["list_response"]["body"][0]
+        snapshot = ActivityRepository(
+            _race_client(),  # type: ignore[arg-type]
+            TRANSLATIONS,
+            asset_fetcher=StaticAssetFetcher(),
+            now_ms=event["start"] + 1,
+        ).fetch_snapshot("race", event_scope="current")
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            snapshot_path = root / "snapshot.json"
+            legacy_image = root / "legacy.png"
+            legacy_image.write_bytes(b"legacy")
+            index_data = {
+                "items": {
+                    "activity-brief:race:default:current": {
+                        "id": snapshot.event_id,
+                        "path": str(legacy_image),
+                        "updatedAtEpoch": 9_999_999_999,
+                        "ttlSeconds": 600,
+                    }
+                }
+            }
+            with (
+                patch(
+                    "btd6_core.activity_brief_service.resolve_activity_snapshot",
+                    return_value=(snapshot_path, snapshot, True),
+                ),
+                patch(
+                    "btd6_core.activity_brief_service.load_index",
+                    return_value=index_data,
+                ),
+                patch(
+                    "btd6_core.activity_brief_service.render_activity_brief"
+                ) as render,
+                patch("btd6_core.activity_brief_service.save_index"),
+            ):
+                _snapshot_path, image_path, _content, cached = resolve_activity_brief(
+                    _race_client(),  # type: ignore[arg-type]
+                    TRANSLATIONS,
+                    "race",
+                    event_scope="current",
+                )
+
+        self.assertFalse(cached)
+        self.assertNotEqual(image_path, legacy_image)
+        render.assert_called_once()
+        self.assertIn("activity-brief:v3:race:default:current", index_data["items"])
 
 
 if __name__ == "__main__":

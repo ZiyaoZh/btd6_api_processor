@@ -46,7 +46,7 @@ def parse_args() -> argparse.Namespace:
         "--activity-type",
         choices=["race", "boss", "odyssey", "daily"],
         default="race",
-        help="brief-image 模式的活动类型（首版图片支持 race、odyssey）。",
+        help="brief-image 模式的活动类型。",
     )
     parser.add_argument(
         "--difficulty",

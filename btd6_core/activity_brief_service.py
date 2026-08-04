@@ -4,7 +4,10 @@ from pathlib import Path
 
 from api_raw_fetcher import ApiClient
 from btd6_core.activity_formatter import format_activity_snapshot
-from btd6_core.activity_renderer import render_activity_brief
+from btd6_core.activity_renderer import (
+    ACTIVITY_BRIEF_RENDER_VERSION,
+    render_activity_brief,
+)
 from btd6_core.activity_repository import resolve_activity_snapshot
 from btd6_core.cache_store import (
     OUTPUT_DIR,
@@ -16,7 +19,7 @@ from btd6_core.cache_store import (
 from btd6_core.common import sanitize_id
 
 
-SUPPORTED_BRIEF_TYPES = {"race", "odyssey"}
+SUPPORTED_BRIEF_TYPES = {"race", "boss", "odyssey", "daily"}
 
 
 def resolve_activity_brief(
@@ -30,7 +33,7 @@ def resolve_activity_brief(
 ) -> tuple[Path, Path, str, bool]:
     normalized_type = str(activity_type or "").strip().lower()
     if normalized_type not in SUPPORTED_BRIEF_TYPES:
-        raise ValueError("活动情报图首版仅支持 race 和 odyssey")
+        raise ValueError("活动情报图仅支持 race、boss、odyssey、daily")
 
     snapshot_path, snapshot, snapshot_cached = resolve_activity_snapshot(
         client,
@@ -41,7 +44,10 @@ def resolve_activity_brief(
         refresh=refresh,
     )
     variant = difficulty if normalized_type == "odyssey" else "default"
-    image_key = f"activity-brief:{normalized_type}:{variant}:{event_scope}"
+    image_key = (
+        f"activity-brief:{ACTIVITY_BRIEF_RENDER_VERSION}:"
+        f"{normalized_type}:{variant}:{event_scope}"
+    )
     image_path = (
         OUTPUT_DIR
         / "briefs"

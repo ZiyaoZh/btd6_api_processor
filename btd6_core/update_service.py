@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from api_raw_fetcher import ApiClient
+from btd6_core.activity_brief_service import resolve_activity_brief
 from btd6_core.collection_event_service import resolve_collection_event
 from btd6_core.detail_service import resolve_detail
 from btd6_core.leaderboard_service import resolve_leaderboard
@@ -23,6 +24,15 @@ def update_all_data(client: ApiClient, trans: dict[str, dict[str, str]]) -> str:
             lines.append(f"- 详细信息刷新失败，已回退旧缓存: {detail_type} -> {path}")
         else:
             lines.append(f"- 已更新详细信息: {detail_type} -> {path}")
+
+    for activity_type in detail_types:
+        _snapshot_path, image_path, _content, _cached = resolve_activity_brief(
+            client,
+            trans,
+            activity_type,
+            refresh=True,
+        )
+        lines.append(f"- 已重新生成活动情报图: {activity_type} -> {image_path}")
 
     leaderboard_types = ["race", "boss-standard", "boss-elite"]
     for lb_type in leaderboard_types:

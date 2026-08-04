@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
+import re
 from pathlib import Path
 from typing import Iterable
 
@@ -28,16 +29,27 @@ WIDTH = 1080
 MAX_HEIGHT = 16000
 MARGIN = 46
 CONTENT_WIDTH = WIDTH - MARGIN * 2
+ACTIVITY_BRIEF_RENDER_VERSION = "v3"
+ACTIVITY_ASSET_DIR = PROJECT_ROOT / "assets" / "activity_brief"
+HEADER_BANNER_PATHS = {
+    "race": ACTIVITY_ASSET_DIR / "race_banner.png",
+    "odyssey": ACTIVITY_ASSET_DIR / "odyssey_banner.png",
+}
+BACKGROUND_PATTERN_PATH = ACTIVITY_ASSET_DIR / "hex_pattern.png"
+HEADER_ART_HEIGHT = 300
+FEATURE_MAP_SIZE = (372, 248)
+ROW_MAP_SIZE = (304, 203)
 
 COLORS = {
-    "background": "#11151a",
-    "surface": "#1c2229",
-    "surface_alt": "#252c34",
-    "border": "#37414c",
-    "text": "#f2f5f7",
-    "muted": "#aeb8c2",
-    "accent": "#18c7c9",
-    "yellow": "#f4c542",
+    "background": "#0d141a",
+    "background_top": "#142735",
+    "surface": "#18232c",
+    "surface_alt": "#22313d",
+    "border": "#355267",
+    "text": "#f5f8fa",
+    "muted": "#b2c0ca",
+    "accent": "#35d1c2",
+    "yellow": "#ffcf45",
     "danger": "#ff6b6b",
     "hero": "#805dad",
     "primary": "#20aeda",
@@ -50,11 +62,99 @@ COLORS = {
 }
 
 
+def _create_background(
+    activity_type: str,
+    fallback_banner_path: Path | None = None,
+) -> Image.Image:
+    gradient = Image.linear_gradient("L").resize((WIDTH, MAX_HEIGHT))
+    image = ImageOps.colorize(
+        gradient,
+        black=COLORS["background_top"],
+        white=COLORS["background"],
+    )
+
+    if BACKGROUND_PATTERN_PATH.is_file():
+        try:
+            with Image.open(BACKGROUND_PATTERN_PATH) as source:
+                pattern = source.convert("L")
+            alpha = pattern.point(lambda value: min(32, max(0, 255 - value)))
+            tint = Image.new("RGB", pattern.size, "#386279")
+            for y in range(0, MAX_HEIGHT, pattern.height):
+                for x in range(0, WIDTH, pattern.width):
+                    image.paste(tint, (x, y), alpha)
+        except (OSError, ValueError):
+            pass
+
+    banner_path = HEADER_BANNER_PATHS.get(activity_type)
+    if banner_path is None or not banner_path.is_file():
+        banner_path = fallback_banner_path
+    if banner_path and banner_path.is_file():
+        try:
+            body_header = image.crop((0, 0, WIDTH, HEADER_ART_HEIGHT))
+            with Image.open(banner_path) as source:
+                rendered = ImageOps.fit(
+                    source.convert("RGBA"),
+                    (WIDTH, HEADER_ART_HEIGHT),
+                    method=Image.Resampling.LANCZOS,
+                    centering=(0.5, 0.5),
+                )
+            layer = body_header.convert("RGBA")
+            layer.alpha_composite(rendered)
+            banner = Image.blend(
+                layer.convert("RGB"),
+                Image.new("RGB", layer.size, "#071722"),
+                0.58,
+            )
+            image.paste(banner, (0, 0))
+
+            fade_height = 88
+            fade_top = HEADER_ART_HEIGHT - fade_height
+            banner_strip = image.crop((0, fade_top, WIDTH, HEADER_ART_HEIGHT))
+            body_strip = body_header.crop((0, fade_top, WIDTH, HEADER_ART_HEIGHT))
+            fade = Image.linear_gradient("L").resize((WIDTH, fade_height))
+            image.paste(
+                Image.composite(body_strip, banner_strip, fade),
+                (0, fade_top),
+            )
+        except (OSError, ValueError):
+            pass
+
+    return image
+
+
+def _paste_header_emblem(image: Image.Image, activity_type: str) -> None:
+    path = ACTIVITY_ASSET_DIR / f"{activity_type}_emblem.png"
+    if not path.is_file():
+        return
+    try:
+        with Image.open(path) as source:
+            rendered = ImageOps.contain(
+                source.convert("RGBA"),
+                (168, 168),
+                method=Image.Resampling.LANCZOS,
+            )
+        alpha = rendered.getchannel("A").point(lambda value: value * 4 // 5)
+        rendered.putalpha(alpha)
+        image.paste(
+            rendered,
+            (WIDTH - MARGIN - rendered.width, 28),
+            rendered,
+        )
+    except (OSError, ValueError):
+        return
+
+
 class BriefCanvas:
-    def __init__(self) -> None:
-        self.image = Image.new("RGB", (WIDTH, MAX_HEIGHT), COLORS["background"])
+    def __init__(self, snapshot: ActivitySnapshot) -> None:
+        self.activity_type = snapshot.activity_type
+        fallback_banner = None
+        if snapshot.challenges:
+            fallback_banner = _resolve_asset_path(
+                snapshot.challenges[0].map_asset.local_path
+            )
+        self.image = _create_background(snapshot.activity_type, fallback_banner)
         self.draw = ImageDraw.Draw(self.image)
-        self.y = 42
+        self.y = 38
         self.fonts: dict[int, ImageFont.ImageFont] = {}
 
     def font(self, size: int) -> ImageFont.ImageFont:
@@ -81,22 +181,71 @@ class BriefCanvas:
             line_x = x
             if align == "center":
                 line_x = x + max(0, (max_width - line_width) / 2)
-            self.draw.text((line_x, self.y), line, font=font, fill=fill or COLORS["text"])
+            _draw_text_top(
+                self.draw,
+                (line_x, self.y),
+                line,
+                font=font,
+                fill=fill or COLORS["text"],
+            )
             self.y += line_height + spacing
         return len(lines) * (line_height + spacing)
 
     def header(self, snapshot: ActivitySnapshot, label: str) -> None:
-        self.text(label, size=30, fill=COLORS["accent"], spacing=4)
-        self.text(snapshot.name, size=54, fill=COLORS["yellow"], spacing=8)
+        _paste_header_emblem(self.image, self.activity_type)
+        has_emblem = (ACTIVITY_ASSET_DIR / f"{self.activity_type}_emblem.png").is_file()
+        header_text_width = 720 if has_emblem else CONTENT_WIDTH
+        self.text(
+            label,
+            size=28,
+            fill=COLORS["accent"],
+            max_width=header_text_width,
+            spacing=8,
+        )
+        title_size = 52
+        while (
+            title_size > 38
+            and self.draw.textlength(snapshot.name, font=self.font(title_size))
+            > header_text_width
+        ):
+            title_size -= 2
+        self.text(
+            snapshot.name,
+            size=title_size,
+            fill=COLORS["yellow"],
+            max_width=header_text_width,
+            spacing=10,
+        )
         if snapshot.description:
-            self.text(snapshot.description, size=24, fill=COLORS["muted"], spacing=5)
-        self.y += 6
-        status = {"current": "进行中", "upcoming": "即将开始", "ended": "已结束"}.get(snapshot.status, "状态未知")
+            self.text(
+                snapshot.description,
+                size=23,
+                fill=COLORS["muted"],
+                max_width=header_text_width,
+                spacing=6,
+            )
+        self.y = max(self.y + 10, 174)
+        status = {
+            "current": "进行中",
+            "upcoming": "即将开始",
+            "ended": "已结束",
+        }.get(snapshot.status, "状态未知")
+        scope = {
+            "current": "当前活动",
+            "upcoming": "下一期",
+            "latest": "最新发布",
+        }.get(snapshot.event_scope, snapshot.event_scope or "范围未知")
         self.tags(
             "",
-            [status, f"ID  {snapshot.event_id}", f"范围  {snapshot.event_scope}"],
+            [status, scope],
             category="accent",
             tag_fill=COLORS["surface_alt"],
+        )
+        self.text(
+            f"活动 ID  {snapshot.event_id}",
+            size=19,
+            fill=COLORS["muted"],
+            spacing=7,
         )
         if snapshot.start_at is not None or snapshot.end_at is not None:
             self.text(
@@ -106,17 +255,22 @@ class BriefCanvas:
                 fill=COLORS["muted"],
                 spacing=4,
             )
-        self.y += 12
+        self.y = max(self.y + 14, HEADER_ART_HEIGHT + 12)
 
     def section(self, title: str) -> None:
-        self.y += 18
-        self.text(title, size=34, fill=COLORS["accent"], spacing=5)
+        self.y += 20
+        self.text(title, size=32, fill=COLORS["accent"], spacing=7)
         self.draw.line(
-            (MARGIN, self.y + 2, WIDTH - MARGIN, self.y + 2),
-            fill=COLORS["accent"],
-            width=2,
+            (MARGIN, self.y + 3, WIDTH - MARGIN, self.y + 3),
+            fill=COLORS["border"],
+            width=1,
         )
-        self.y += 18
+        self.draw.line(
+            (MARGIN, self.y + 3, MARGIN + 78, self.y + 3),
+            fill=COLORS["yellow"],
+            width=4,
+        )
+        self.y += 19
 
     def key_values(self, values: Iterable[tuple[str, str]], *, columns: int = 3) -> None:
         items = list(values)
@@ -124,8 +278,9 @@ class BriefCanvas:
             return
         gap = 12
         cell_width = (CONTENT_WIDTH - gap * (columns - 1)) // columns
-        font = self.font(24)
-        row_height = 62
+        label_font = self.font(18)
+        value_font = self.font(25)
+        row_height = 76
         for start in range(0, len(items), columns):
             row = items[start : start + columns]
             for column, (label, value) in enumerate(row):
@@ -140,9 +295,23 @@ class BriefCanvas:
                     outline=COLORS["border"],
                     width=1,
                 )
-                self.draw.rectangle((x1, y1, x1 + 6, y2), fill=COLORS["yellow"])
-                rendered = _truncate_text(self.draw, f"{label}  {value}", font, cell_width - 30)
-                self.draw.text((x1 + 18, y1 + 15), rendered, font=font, fill=COLORS["text"])
+                self.draw.rectangle((x1, y1 + 7, x1 + 5, y2 - 7), fill=COLORS["yellow"])
+                label_text = _truncate_text(self.draw, label, label_font, cell_width - 34)
+                value_text = _truncate_text(self.draw, value, value_font, cell_width - 34)
+                _draw_text_top(
+                    self.draw,
+                    (x1 + 18, y1 + 10),
+                    label_text,
+                    font=label_font,
+                    fill=COLORS["muted"],
+                )
+                _draw_text_top(
+                    self.draw,
+                    (x1 + 18, y1 + 38),
+                    value_text,
+                    font=value_font,
+                    fill=COLORS["text"],
+                )
             self.y += row_height + gap
         self.y += 4
 
@@ -158,20 +327,26 @@ class BriefCanvas:
         if not items:
             return
         label_width = 112 if label else 0
-        line_height = 48
+        font = self.font(22)
+        tag_height = max(40, _line_height(self.draw, font) + 16)
+        line_height = tag_height + 8
         gap = 9
-        start_y = self.y
         if label:
             self.draw.rounded_rectangle(
-                (MARGIN, self.y, MARGIN + label_width - 8, self.y + 42),
+                (MARGIN, self.y, MARGIN + label_width - 8, self.y + tag_height),
                 radius=5,
                 fill=COLORS.get(category, COLORS["unknown"]),
             )
             label_font = self.font(22)
             display_label = _truncate_text(self.draw, label, label_font, label_width - 24)
-            self.draw.text((MARGIN + 12, self.y + 8), display_label, font=label_font, fill="#ffffff")
+            _draw_text_in_rect(
+                self.draw,
+                (MARGIN + 12, self.y, MARGIN + label_width - 18, self.y + tag_height),
+                display_label,
+                font=label_font,
+                fill="#ffffff",
+            )
 
-        font = self.font(22)
         x = MARGIN + label_width
         max_x = WIDTH - MARGIN
         for value in items:
@@ -182,17 +357,21 @@ class BriefCanvas:
                 x = MARGIN + label_width
                 self.y += line_height
             self.draw.rounded_rectangle(
-                (x, self.y, x + tag_width, self.y + 42),
+                (x, self.y, x + tag_width, self.y + tag_height),
                 radius=5,
                 fill=tag_fill or COLORS["surface_alt"],
                 outline=COLORS["border"],
                 width=1,
             )
-            self.draw.text((x + 14, self.y + 8), display, font=font, fill=COLORS["text"])
+            _draw_text_in_rect(
+                self.draw,
+                (x + 14, self.y, x + tag_width - 10, self.y + tag_height),
+                display,
+                font=font,
+                fill=COLORS["text"],
+            )
             x += tag_width + gap
         self.y += line_height
-        if self.y == start_y:
-            self.y += line_height
 
     def map_feature(self, challenge: ChallengeConfig) -> None:
         top = self.y
@@ -204,10 +383,10 @@ class BriefCanvas:
         badge_height = _badge_flow_height(
             self.draw,
             modifier_badges,
-            max_width=CONTENT_WIDTH - 40,
+            max_width=WIDTH - MARGIN - (MARGIN + 410) - 18,
             font=badge_font,
         )
-        height = 274 + max(0, badge_height - 29)
+        height = max(272, 222 + badge_height + 16 if modifier_badges else 272)
         self.draw.rounded_rectangle(
             (MARGIN, top, WIDTH - MARGIN, top + height),
             radius=7,
@@ -215,7 +394,12 @@ class BriefCanvas:
             outline=COLORS["border"],
             width=1,
         )
-        image_box = (MARGIN + 12, top + 12, MARGIN + 384, top + 222)
+        image_box = (
+            MARGIN + 12,
+            top + 12,
+            MARGIN + 12 + FEATURE_MAP_SIZE[0],
+            top + 12 + FEATURE_MAP_SIZE[1],
+        )
         _paste_map(self.image, self.draw, challenge, image_box, self.font(24))
         content_x = MARGIN + 410
         content_width = WIDTH - MARGIN - content_x - 18
@@ -226,7 +410,13 @@ class BriefCanvas:
             title_font,
             content_width,
         )
-        self.draw.text((content_x, top + 18), title, font=title_font, fill=COLORS["yellow"])
+        _draw_text_top(
+            self.draw,
+            (content_x, top + 18),
+            title,
+            font=title_font,
+            fill=COLORS["yellow"],
+        )
         facts = [
             ("难度", challenge.difficulty_name or challenge.difficulty_id or "未知"),
             ("模式", challenge.mode_name or challenge.mode_id or "未知"),
@@ -242,16 +432,22 @@ class BriefCanvas:
             column = index % 2
             row = index // 2
             x = content_x + column * col_width
-            y = top + 72 + row * 42
+            y = top + 72 + row * 38
             rendered = _truncate_text(self.draw, f"{label}  {value}", fact_font, col_width - 12)
-            self.draw.text((x, y), rendered, font=fact_font, fill=COLORS["text"])
+            _draw_text_top(
+                self.draw,
+                (x, y),
+                rendered,
+                font=fact_font,
+                fill=COLORS["text"],
+            )
         if modifier_badges:
             _draw_inline_badges(
                 self.draw,
                 modifier_badges,
-                x=MARGIN + 20,
-                y=top + 232,
-                max_width=CONTENT_WIDTH - 40,
+                x=content_x,
+                y=top + 222,
+                max_width=content_width,
                 font=badge_font,
             )
         self.y = top + height + 14
@@ -270,10 +466,10 @@ class BriefCanvas:
         badge_height = _badge_flow_height(
             self.draw,
             badges,
-            max_width=WIDTH - MARGIN - (MARGIN + 330) - 16,
+            max_width=WIDTH - MARGIN - (MARGIN + 340) - 16,
             font=badge_font,
         )
-        height = 226 + (badge_height + 10 if badges else 0)
+        height = max(227, 207 + badge_height + 14 if badges else 227)
         self.draw.rounded_rectangle(
             (MARGIN, top, WIDTH - MARGIN, top + height),
             radius=7,
@@ -281,9 +477,14 @@ class BriefCanvas:
             outline=COLORS["border"],
             width=1,
         )
-        image_box = (MARGIN + 10, top + 10, MARGIN + 306, top + height - 10)
+        image_box = (
+            MARGIN + 12,
+            top + 12,
+            MARGIN + 12 + ROW_MAP_SIZE[0],
+            top + 12 + ROW_MAP_SIZE[1],
+        )
         _paste_map(self.image, self.draw, challenge, image_box, self.font(22))
-        x = MARGIN + 330
+        x = MARGIN + 340
         available_width = WIDTH - MARGIN - x - 16
         title = _truncate_text(
             self.draw,
@@ -291,8 +492,15 @@ class BriefCanvas:
             self.font(28),
             available_width,
         )
-        self.draw.text((x, top + 16), title, font=self.font(28), fill=COLORS["yellow"])
-        self.draw.text(
+        _draw_text_top(
+            self.draw,
+            (x, top + 15),
+            title,
+            font=self.font(28),
+            fill=COLORS["yellow"],
+        )
+        _draw_text_top(
+            self.draw,
             (x, top + 56),
             _truncate_text(self.draw, challenge.map_id, self.font(19), available_width),
             font=self.font(19),
@@ -313,27 +521,45 @@ class BriefCanvas:
             column = item_index % 2
             row = item_index // 2
             rendered = _truncate_text(self.draw, fact, fact_font, col_width - 10)
-            self.draw.text((x + column * col_width, top + 88 + row * 33), rendered, font=fact_font, fill=COLORS["text"])
+            _draw_text_top(
+                self.draw,
+                (x + column * col_width, top + 86 + row * 30),
+                rendered,
+                font=fact_font,
+                fill=COLORS["text"],
+            )
         if badges:
             _draw_inline_badges(
                 self.draw,
                 badges,
                 x=x,
-                y=top + 222,
+                y=top + 207,
                 max_width=available_width,
                 font=badge_font,
             )
         self.y = top + height + 14
 
-    def footer(self, fetched_at: str) -> None:
+    def footer(self) -> None:
         self.y += 12
         self.draw.line((MARGIN, self.y, WIDTH - MARGIN, self.y), fill=COLORS["border"], width=1)
         self.y += 15
         font = self.font(19)
-        self.draw.text((MARGIN, self.y), "数据来源  Ninja Kiwi Open Data API", font=font, fill=COLORS["muted"])
-        fetched = f"快照  {fetched_at}"
-        width = self.draw.textlength(fetched, font=font)
-        self.draw.text((WIDTH - MARGIN - width, self.y), fetched, font=font, fill=COLORS["muted"])
+        _draw_text_top(
+            self.draw,
+            (MARGIN, self.y),
+            "数据来源  Ninja Kiwi Open Data API",
+            font=font,
+            fill=COLORS["muted"],
+        )
+        credit = "图片生成  小污猫"
+        width = self.draw.textlength(credit, font=font)
+        _draw_text_top(
+            self.draw,
+            (WIDTH - MARGIN - width, self.y),
+            credit,
+            font=font,
+            fill=COLORS["muted"],
+        )
         self.y += _line_height(self.draw, font) + 30
 
     def finish(self, output_path: Path) -> None:
@@ -344,13 +570,16 @@ class BriefCanvas:
 
 
 def render_activity_brief(snapshot: ActivitySnapshot, output_path: Path) -> None:
-    if snapshot.activity_type == "race":
-        RaceBriefRenderer().render(snapshot, output_path)
-        return
-    if snapshot.activity_type == "odyssey":
-        OdysseyBriefRenderer().render(snapshot, output_path)
-        return
-    raise ValueError("活动情报图首版仅支持 race 和 odyssey")
+    renderers = {
+        "race": RaceBriefRenderer,
+        "boss": BossBriefRenderer,
+        "odyssey": OdysseyBriefRenderer,
+        "daily": DailyBriefRenderer,
+    }
+    renderer_type = renderers.get(snapshot.activity_type)
+    if renderer_type is None:
+        raise ValueError("活动情报图仅支持 race、boss、odyssey、daily")
+    renderer_type().render(snapshot, output_path)
 
 
 class RaceBriefRenderer:
@@ -358,7 +587,7 @@ class RaceBriefRenderer:
         if not snapshot.challenges:
             raise RuntimeError("竞速快照缺少挑战配置")
         challenge = snapshot.challenges[0]
-        canvas = BriefCanvas()
+        canvas = BriefCanvas(snapshot)
         canvas.header(snapshot, "竞速情报")
         total_scores = snapshot.score_counts.get("total")
         if total_scores is not None:
@@ -366,27 +595,81 @@ class RaceBriefRenderer:
         canvas.section("地图与规则")
         canvas.map_feature(challenge)
 
-        special_rules = _special_rule_tags(challenge)
-        if special_rules:
-            canvas.tags("规则", special_rules, category="accent")
+        _draw_challenge_rules(canvas, challenge)
+        canvas.footer()
+        canvas.finish(output_path)
 
-        canvas.section("可用防御塔")
-        available = [item for item in challenge.tower_rules if item.is_available]
-        _draw_tower_groups(canvas, available)
-        if not available:
-            canvas.text("API 未提供防御塔限制。", size=23, fill=COLORS["muted"])
 
-        banned = [
-            item.name
-            for item in challenge.tower_rules
-            if not item.is_available
-            and not item.is_hero
-            and not item.unknown_fields.get("maxMissing")
-        ]
-        if banned:
-            canvas.section("禁用防御塔")
-            canvas.tags("禁用", banned, category="danger", tag_fill="#312a2d")
-        canvas.footer(snapshot.fetched_at)
+class BossBriefRenderer:
+    def render(self, snapshot: ActivitySnapshot, output_path: Path) -> None:
+        if not snapshot.challenges:
+            raise RuntimeError("Boss 快照缺少挑战配置")
+        canvas = BriefCanvas(snapshot)
+        canvas.header(snapshot, "Boss 情报")
+        canvas.key_values(
+            [
+                (
+                    "Boss 类型",
+                    str(snapshot.attributes.get("boss_type_name", "") or "未知"),
+                ),
+                (
+                    "标准提交",
+                    _show_count(snapshot.score_counts.get("standard")),
+                ),
+                (
+                    "精英提交",
+                    _show_count(snapshot.score_counts.get("elite")),
+                ),
+            ],
+            columns=3,
+        )
+
+        scoring_types = {
+            "standard": snapshot.attributes.get("normal_scoring_type"),
+            "elite": snapshot.attributes.get("elite_scoring_type"),
+        }
+        for challenge in snapshot.challenges:
+            variant_label = _challenge_variant_label(challenge.label)
+            canvas.section(f"{variant_label}模式")
+            canvas.tags(
+                "计分",
+                [_scoring_type_label(scoring_types.get(challenge.label))],
+                category="accent" if challenge.label == "standard" else "danger",
+            )
+            canvas.map_feature(challenge)
+            _draw_challenge_rules(
+                canvas,
+                challenge,
+                available_title=f"{variant_label}可用防御塔",
+                banned_title=f"{variant_label}禁用防御塔",
+            )
+
+        canvas.footer()
+        canvas.finish(output_path)
+
+
+class DailyBriefRenderer:
+    def render(self, snapshot: ActivitySnapshot, output_path: Path) -> None:
+        if not snapshot.challenges:
+            raise RuntimeError("每日挑战快照缺少挑战配置")
+        challenge = snapshot.challenges[0]
+        canvas = BriefCanvas(snapshot)
+        canvas.header(snapshot, "每日挑战情报")
+        created_at = snapshot.attributes.get("created_at")
+        if isinstance(created_at, int) and not isinstance(created_at, bool):
+            canvas.key_values(
+                [
+                    (
+                        f"发布时间  UTC{activity_timezone_label()}",
+                        format_activity_time(created_at),
+                    )
+                ],
+                columns=1,
+            )
+        canvas.section("地图与规则")
+        canvas.map_feature(challenge)
+        _draw_challenge_rules(canvas, challenge)
+        canvas.footer()
         canvas.finish(output_path)
 
 
@@ -395,7 +678,7 @@ class OdysseyBriefRenderer:
         odyssey = snapshot.odyssey
         if odyssey is None:
             raise RuntimeError("征程快照缺少难度配置")
-        canvas = BriefCanvas()
+        canvas = BriefCanvas(snapshot)
         canvas.header(snapshot, "征程情报")
         canvas.tags(
             "难度",
@@ -432,8 +715,37 @@ class OdysseyBriefRenderer:
             canvas.map_row(challenge, index)
         if not odyssey.maps:
             canvas.text("API 未返回征程地图。", size=23, fill=COLORS["muted"])
-        canvas.footer(snapshot.fetched_at)
+        canvas.footer()
         canvas.finish(output_path)
+
+
+def _draw_challenge_rules(
+    canvas: BriefCanvas,
+    challenge: ChallengeConfig,
+    *,
+    available_title: str = "可用防御塔",
+    banned_title: str = "禁用防御塔",
+) -> None:
+    special_rules = _special_rule_tags(challenge)
+    if special_rules:
+        canvas.tags("规则", special_rules, category="accent")
+
+    canvas.section(available_title)
+    available = [item for item in challenge.tower_rules if item.is_available]
+    _draw_tower_groups(canvas, available)
+    if not available:
+        canvas.text("API 未提供防御塔限制。", size=23, fill=COLORS["muted"])
+
+    banned = [
+        item.name
+        for item in challenge.tower_rules
+        if not item.is_available
+        and not item.is_hero
+        and not item.unknown_fields.get("maxMissing")
+    ]
+    if banned:
+        canvas.section(banned_title)
+        canvas.tags("禁用", banned, category="danger", tag_fill="#312a2d")
 
 
 def _draw_tower_groups(canvas: BriefCanvas, rules: Iterable[TowerRule]) -> None:
@@ -468,6 +780,24 @@ def _power_text(item: PowerRule) -> str:
     return item.name if item.max_count is None else f"{item.name}  x{item.max_count}"
 
 
+def _show_count(value: object) -> str:
+    if isinstance(value, int) and not isinstance(value, bool):
+        return f"{value:,}"
+    return "未知"
+
+
+def _challenge_variant_label(value: str) -> str:
+    return {"standard": "标准", "elite": "精英"}.get(value, value or "挑战")
+
+
+def _scoring_type_label(value: object) -> str:
+    return {
+        "GameTime": "最短时间",
+        "LeastCash": "最少现金",
+        "LeastTiers": "最少阶数",
+    }.get(str(value or ""), str(value or "未知"))
+
+
 def _special_rule_tags(challenge: ChallengeConfig) -> list[str]:
     values = (
         ("禁用双倍现金", challenge.disable_double_cash),
@@ -488,31 +818,52 @@ def _paste_map(
     font: ImageFont.ImageFont,
 ) -> None:
     x1, y1, x2, y2 = box
-    draw.rounded_rectangle(box, radius=5, fill="#0d1115", outline=COLORS["border"], width=1)
+    width = x2 - x1
+    height = y2 - y1
+    draw.rounded_rectangle(
+        (x1, y1, x2 - 1, y2 - 1),
+        radius=8,
+        fill="#0a1116",
+    )
     asset_path = _resolve_asset_path(challenge.map_asset.local_path)
     if asset_path and asset_path.is_file():
         try:
             with Image.open(asset_path) as source:
-                rendered = ImageOps.contain(
-                    source.convert("RGB"),
-                    (x2 - x1, y2 - y1),
-                    method=Image.Resampling.LANCZOS,
+                rendered = source.convert("RGB").resize(
+                    (width, height),
+                    resample=Image.Resampling.LANCZOS,
                 )
-            paste_x = x1 + (x2 - x1 - rendered.width) // 2
-            paste_y = y1 + (y2 - y1 - rendered.height) // 2
-            image.paste(rendered, (paste_x, paste_y))
+            mask = Image.new("L", rendered.size, 0)
+            ImageDraw.Draw(mask).rounded_rectangle(
+                (0, 0, width - 1, height - 1),
+                radius=8,
+                fill=255,
+            )
+            image.paste(rendered, (x1, y1), mask)
+            draw.rounded_rectangle(
+                (x1, y1, x2 - 1, y2 - 1),
+                radius=8,
+                outline=COLORS["border"],
+                width=2,
+            )
             return
         except (OSError, ValueError):
             pass
     label = challenge.map_name or challenge.map_id or "地图资源不可用"
-    display = _truncate_text(draw, label, font, max(20, x2 - x1 - 30))
-    width = draw.textlength(display, font=font)
-    height = _line_height(draw, font)
-    draw.text(
-        (x1 + (x2 - x1 - width) / 2, y1 + (y2 - y1 - height) / 2),
+    display = _truncate_text(draw, label, font, max(20, width - 30))
+    _draw_text_in_rect(
+        draw,
+        (x1 + 15, y1, x2 - 15, y2),
         display,
         font=font,
         fill=COLORS["muted"],
+        align="center",
+    )
+    draw.rounded_rectangle(
+        (x1, y1, x2 - 1, y2 - 1),
+        radius=8,
+        outline=COLORS["border"],
+        width=2,
     )
 
 
@@ -535,18 +886,26 @@ def _draw_inline_badges(
     cursor = x
     max_x = x + max_width
     cursor_y = y
+    badge_height = _badge_height(draw, font)
+    row_step = badge_height + 6
     for value, fill in values:
         display = _truncate_text(draw, value, font, max_width - 22)
         width = int(draw.textlength(display, font=font)) + 22
         if cursor + width > max_x and cursor > x:
             cursor = x
-            cursor_y += 35
+            cursor_y += row_step
         draw.rounded_rectangle(
-            (cursor, cursor_y, cursor + width, cursor_y + 29),
+            (cursor, cursor_y, cursor + width, cursor_y + badge_height),
             radius=4,
             fill=fill,
         )
-        draw.text((cursor + 11, cursor_y + 4), display, font=font, fill="#ffffff")
+        _draw_text_in_rect(
+            draw,
+            (cursor + 11, cursor_y, cursor + width - 8, cursor_y + badge_height),
+            display,
+            font=font,
+            fill="#ffffff",
+        )
         cursor += width + 8
 
 
@@ -560,6 +919,8 @@ def _badge_flow_height(
     cursor = 0
     rows = 1
     has_values = False
+    badge_height = _badge_height(draw, font)
+    row_step = badge_height + 6
     for value, _fill in values:
         has_values = True
         display = _truncate_text(draw, value, font, max_width - 22)
@@ -568,7 +929,49 @@ def _badge_flow_height(
             rows += 1
             cursor = 0
         cursor += width + 8
-    return 0 if not has_values else 29 + (rows - 1) * 35
+    return 0 if not has_values else badge_height + (rows - 1) * row_step
+
+
+def _badge_height(draw: ImageDraw.ImageDraw, font: ImageFont.ImageFont) -> int:
+    return max(29, _line_height(draw, font) + 12)
+
+
+def _draw_text_top(
+    draw: ImageDraw.ImageDraw,
+    position: tuple[float, float],
+    text: str,
+    *,
+    font: ImageFont.ImageFont,
+    fill: str,
+) -> tuple[float, float, float, float]:
+    left, top, right, bottom = draw.textbbox((0, 0), text, font=font)
+    x, y = position
+    draw.text((x - left, y - top), text, font=font, fill=fill)
+    return (x, y, x + right - left, y + bottom - top)
+
+
+def _draw_text_in_rect(
+    draw: ImageDraw.ImageDraw,
+    rect: tuple[float, float, float, float],
+    text: str,
+    *,
+    font: ImageFont.ImageFont,
+    fill: str,
+    align: str = "left",
+) -> tuple[float, float, float, float]:
+    x1, y1, x2, y2 = rect
+    left, top, right, bottom = draw.textbbox((0, 0), text, font=font)
+    text_width = right - left
+    text_height = bottom - top
+    if align == "center":
+        ink_x = x1 + max(0, (x2 - x1 - text_width) / 2)
+    elif align == "right":
+        ink_x = x2 - text_width
+    else:
+        ink_x = x1
+    ink_y = y1 + max(0, (y2 - y1 - text_height) / 2)
+    draw.text((ink_x - left, ink_y - top), text, font=font, fill=fill)
+    return (ink_x, ink_y, ink_x + text_width, ink_y + text_height)
 
 
 def _wrap_text(
@@ -581,6 +984,9 @@ def _wrap_text(
         return [""]
     lines: list[str] = []
     for paragraph in text.splitlines() or [""]:
+        if " " in paragraph:
+            lines.extend(_wrap_spaced_text(draw, paragraph, font, max_width))
+            continue
         current = ""
         for character in paragraph:
             candidate = current + character
@@ -591,6 +997,39 @@ def _wrap_text(
                 current = candidate
         lines.append(current.rstrip())
     return lines or [""]
+
+
+def _wrap_spaced_text(
+    draw: ImageDraw.ImageDraw,
+    text: str,
+    font: ImageFont.ImageFont,
+    max_width: int,
+) -> list[str]:
+    words = [item for item in re.split(r"\s+", text.strip()) if item]
+    if not words:
+        return [""]
+    lines: list[str] = []
+    current = ""
+    for word in words:
+        candidate = word if not current else f"{current} {word}"
+        if current and draw.textlength(candidate, font=font) > max_width:
+            lines.append(current)
+            current = word
+        else:
+            current = candidate
+        if draw.textlength(current, font=font) <= max_width:
+            continue
+        overflow = current
+        current = ""
+        for character in overflow:
+            candidate = current + character
+            if current and draw.textlength(candidate, font=font) > max_width:
+                lines.append(current.rstrip())
+                current = character.lstrip()
+            else:
+                current = candidate
+    lines.append(current.rstrip())
+    return lines
 
 
 def _truncate_text(

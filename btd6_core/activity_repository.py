@@ -383,6 +383,10 @@ class ActivityRepository:
     ) -> ActivitySnapshot:
         start_at = _int(event.get("start"))
         end_at = _int(event.get("end"))
+        normalized_attributes = attributes or {}
+        status_start_at = start_at
+        if activity_type == "daily":
+            status_start_at = _int(normalized_attributes.get("created_at"))
         return ActivitySnapshot(
             schema_version=SNAPSHOT_SCHEMA_VERSION,
             activity_type=activity_type,
@@ -391,12 +395,12 @@ class ActivityRepository:
             description=_text(event.get("description")),
             start_at=start_at,
             end_at=end_at,
-            status=event_status(start_at, end_at, now_ms=self.now_ms),
+            status=event_status(status_start_at, end_at, now_ms=self.now_ms),
             event_scope=event_scope,
             fetched_at=_now_iso(),
             score_counts=score_counts,
             source_urls={key: value for key, value in source_urls.items() if value},
-            attributes=attributes or {},
+            attributes=normalized_attributes,
             challenges=challenges,
             odyssey=odyssey,
             unknown_fields=_unknown_fields(event, known_event_fields),
