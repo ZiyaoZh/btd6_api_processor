@@ -9,6 +9,8 @@ import sys
 from pathlib import Path
 
 from api_raw_fetcher import ApiClient
+from btd6_core.activity_brief_service import resolve_activity_brief
+from btd6_core.activity_repository import resolve_activity_snapshot
 from btd6_core.cache_store import resolve_project_path
 from btd6_core.collection_event_service import resolve_collection_event
 from btd6_core.common import parse_translation_tables
@@ -25,9 +27,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output", default="output/btd6_digest.md", help="输出文件路径")
     parser.add_argument(
         "--mode",
-        choices=["summary", "detail", "leaderboard", "collection-event", "update"],
+        choices=["summary", "detail", "brief-image", "leaderboard", "collection-event", "update"],
         default="summary",
-        help="输出模式：summary=简报，detail=最新一期详细信息，leaderboard=排行榜，collection-event=收集活动轮换，update=手动更新所有数据",
+        help="输出模式：summary=简报，detail=活动详情，brief-image=确定性活动情报图，leaderboard=排行榜，collection-event=收集活动轮换，update=手动更新所有数据",
     )
     parser.add_argument(
         "--detail-types",
@@ -39,6 +41,24 @@ def parse_args() -> argparse.Namespace:
         choices=["race", "boss-standard", "boss-elite"],
         default="race",
         help="leaderboard 模式类型",
+    )
+    parser.add_argument(
+        "--activity-type",
+        choices=["race", "boss", "odyssey", "daily"],
+        default="race",
+        help="brief-image 模式的活动类型（首版图片支持 race、odyssey）。",
+    )
+    parser.add_argument(
+        "--difficulty",
+        choices=["easy", "medium", "hard"],
+        default="hard",
+        help="征程难度。",
+    )
+    parser.add_argument(
+        "--event-scope",
+        choices=["current", "upcoming", "latest"],
+        default=None,
+        help="活动范围：当前、下一期或列表中开始时间最新的一期；detail 默认 latest，brief-image 默认 current。",
     )
     parser.add_argument(
         "--leaderboard-format",
@@ -76,6 +96,7 @@ def main() -> int:
             report = f"# 来源: {source}\n# 文件: {path}\n\n{content}"
 
         elif args.mode == "detail":
+            event_scope = args.event_scope or "latest"
             requested = [x.strip() for x in args.detail_types.split(",") if x.strip()]
             valid = {"race", "boss", "odyssey", "daily"}
             unknown = [x for x in requested if x not in valid]
@@ -85,10 +106,28 @@ def main() -> int:
             paths: list[Path] = []
             blocks: list[str] = []
             for detail_type in requested:
-                path, content, cached = resolve_detail(client, trans, detail_type, refresh=False)
-                source = "缓存" if cached else "远程"
-                blocks.append(f"# 来源: {source}\n# 文件: {path}\n\n{content}")
+                snapshot_path, _snapshot, snapshot_cached = resolve_activity_snapshot(
+                    client,
+                    trans,
+                    detail_type,
+                    difficulty=args.difficulty,
+                    event_scope=event_scope,
+                    refresh=False,
+                )
+                path, content, cached = resolve_detail(
+                    client,
+                    trans,
+                    detail_type,
+                    refresh=False,
+                    difficulty=args.difficulty,
+                    event_scope=event_scope,
+                )
+                source = "缓存" if cached and snapshot_cached else "远程"
+                blocks.append(
+                    f"# 来源: {source}\n# 文件: {path}\n# JSON: {snapshot_path}\n\n{content}"
+                )
                 paths.append(path)
+                paths.append(snapshot_path)
 
             if len(blocks) == 1:
                 report = blocks[0]
@@ -101,6 +140,26 @@ def main() -> int:
                 summary.append("")
                 summary.append("\n\n".join(blocks))
                 report = "\n".join(summary)
+
+        elif args.mode == "brief-image":
+            event_scope = args.event_scope or "current"
+            snapshot_path, image_path, content, cached = resolve_activity_brief(
+                client,
+                trans,
+                args.activity_type,
+                difficulty=args.difficulty,
+                event_scope=event_scope,
+                refresh=False,
+            )
+            report = "\n".join(
+                [
+                    f"# 来源: {'缓存' if cached else '远程/渲染'}",
+                    f"# JSON: {snapshot_path}",
+                    f"# 图片: {image_path}",
+                    "",
+                    content,
+                ]
+            )
 
         elif args.mode == "leaderboard":
             path, content, cached = resolve_leaderboard(

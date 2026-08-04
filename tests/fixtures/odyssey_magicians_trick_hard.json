@@ -1,0 +1,860 @@
+{
+  "_fixture": {
+    "captured_at": "2026-08-04T02:00:00Z",
+    "source_urls": [
+      "https://data.ninjakiwi.com/btd6/odyssey",
+      "https://data.ninjakiwi.com/btd6/odyssey/mrkd1iia/hard",
+      "https://data.ninjakiwi.com/btd6/odyssey/mrkd1iia/hard/maps"
+    ],
+    "selected_list_record_only": true,
+    "difficulty": "hard",
+    "sample_image": "image_samples/8E6A80EA82136530C3E24400ED12557A.png",
+    "raw_response_sha256": {
+      "metadata": "23bf33b43f555b35c93d8a588339b4ec9c88aa7a28530c78add14c48065751b2",
+      "maps": "1a9f6711e35b79d140d5990f32b5e800d9d9d0e3ce51b4fbff0b7ff7bba49665"
+    }
+  },
+  "list_response": {
+    "error": null,
+    "success": true,
+    "body": [
+      {
+        "id": "mrkd1iia",
+        "name": "A Magician's trick",
+        "description": "A true magician never reveals his tricks!",
+        "start": 1784167200000,
+        "end": 1784685600000,
+        "metadata_easy": "https://data.ninjakiwi.com/btd6/odyssey/mrkd1iia/easy",
+        "metadata_medium": "https://data.ninjakiwi.com/btd6/odyssey/mrkd1iia/medium",
+        "metadata_hard": "https://data.ninjakiwi.com/btd6/odyssey/mrkd1iia/hard"
+      }
+    ],
+    "model": {
+      "name": "_btd6odyssey",
+      "parameters": {
+        "id": {
+          "description": "Odyssey Event ID",
+          "type": "string"
+        },
+        "name": {
+          "description": "Odyssey Name",
+          "type": "string"
+        },
+        "description": {
+          "description": "Odyssey Description",
+          "type": "string"
+        },
+        "start": {
+          "description": "Odyssey start time in unix epoch milliseconds",
+          "type": "number"
+        },
+        "end": {
+          "description": "Odyssey end time in unix epoch milliseconds",
+          "type": "number"
+        },
+        "metadata_easy": {
+          "description": "URL to Easy Mode Settings",
+          "type": "string"
+        },
+        "metadata_medium": {
+          "description": "URL to Medium Mode Settings",
+          "type": "string"
+        },
+        "metadata_hard": {
+          "description": "URL to Hard Mode Settings",
+          "type": "string"
+        }
+      }
+    },
+    "next": null,
+    "prev": null
+  },
+  "metadata_response": {
+    "error": null,
+    "success": true,
+    "body": {
+      "id": "mrkd1iia",
+      "isExtreme": false,
+      "maxMonkeySeats": 6,
+      "maxMonkeysOnBoat": 18,
+      "maxPowerSlots": 8,
+      "startingHealth": 50,
+      "_rewards": [
+        "MonkeyMoney:400",
+        "InstaMonkey:WizardMonkey,402"
+      ],
+      "_availablePowers": [
+        {
+          "power": "BananaFarmer",
+          "max": 4
+        },
+        {
+          "power": "CamoTrap",
+          "max": 0
+        },
+        {
+          "power": "CashDrop",
+          "max": 4
+        },
+        {
+          "power": "GlueTrap",
+          "max": 0
+        },
+        {
+          "power": "MoabMine",
+          "max": 0
+        },
+        {
+          "power": "MonkeyBoost",
+          "max": 4
+        },
+        {
+          "power": "Pontoon",
+          "max": 4
+        },
+        {
+          "power": "PortableLake",
+          "max": 4
+        },
+        {
+          "power": "RoadSpikes",
+          "max": 24
+        },
+        {
+          "power": "SuperMonkeyStorm",
+          "max": 4
+        },
+        {
+          "power": "Thrive",
+          "max": 0
+        },
+        {
+          "power": "DartTime",
+          "max": 4
+        },
+        {
+          "power": "EnergisingTotem",
+          "max": 0
+        },
+        {
+          "power": "TechBot",
+          "max": 4
+        },
+        {
+          "power": "CaveMonkey",
+          "max": 4
+        },
+        {
+          "power": "BananaFarmerPro",
+          "max": 4
+        },
+        {
+          "power": "SuperMonkeyBeacon",
+          "max": 4
+        },
+        {
+          "power": "TechBotPrime",
+          "max": 4
+        },
+        {
+          "power": "MonkeyBoostPro",
+          "max": 4
+        }
+      ],
+      "_availableTowers": [
+        {
+          "tower": "ObynGreenfoot",
+          "max": 1,
+          "path1NumBlockedTiers": 0,
+          "path2NumBlockedTiers": 0,
+          "path3NumBlockedTiers": 0,
+          "isHero": true
+        },
+        {
+          "tower": "Ezili",
+          "max": 1,
+          "path1NumBlockedTiers": 0,
+          "path2NumBlockedTiers": 0,
+          "path3NumBlockedTiers": 0,
+          "isHero": true
+        },
+        {
+          "tower": "Adora",
+          "max": 1,
+          "path1NumBlockedTiers": 0,
+          "path2NumBlockedTiers": 0,
+          "path3NumBlockedTiers": 0,
+          "isHero": true
+        },
+        {
+          "tower": "Psi",
+          "max": 1,
+          "path1NumBlockedTiers": 0,
+          "path2NumBlockedTiers": 0,
+          "path3NumBlockedTiers": 0,
+          "isHero": true
+        },
+        {
+          "tower": "Corvus",
+          "max": 1,
+          "path1NumBlockedTiers": 0,
+          "path2NumBlockedTiers": 0,
+          "path3NumBlockedTiers": 0,
+          "isHero": true
+        },
+        {
+          "tower": "Silas",
+          "max": 1,
+          "path1NumBlockedTiers": 0,
+          "path2NumBlockedTiers": 0,
+          "path3NumBlockedTiers": 0,
+          "isHero": true
+        },
+        {
+          "tower": "WizardMonkey",
+          "max": 3,
+          "path1NumBlockedTiers": 0,
+          "path2NumBlockedTiers": 0,
+          "path3NumBlockedTiers": 0,
+          "isHero": false
+        },
+        {
+          "tower": "SuperMonkey",
+          "max": 3,
+          "path1NumBlockedTiers": 0,
+          "path2NumBlockedTiers": 0,
+          "path3NumBlockedTiers": 0,
+          "isHero": false
+        },
+        {
+          "tower": "NinjaMonkey",
+          "max": 3,
+          "path1NumBlockedTiers": 0,
+          "path2NumBlockedTiers": 0,
+          "path3NumBlockedTiers": 0,
+          "isHero": false
+        },
+        {
+          "tower": "Alchemist",
+          "max": 3,
+          "path1NumBlockedTiers": 0,
+          "path2NumBlockedTiers": 0,
+          "path3NumBlockedTiers": 0,
+          "isHero": false
+        },
+        {
+          "tower": "Druid",
+          "max": 3,
+          "path1NumBlockedTiers": 0,
+          "path2NumBlockedTiers": 0,
+          "path3NumBlockedTiers": 0,
+          "isHero": false
+        },
+        {
+          "tower": "Mermonkey",
+          "max": 3,
+          "path1NumBlockedTiers": 0,
+          "path2NumBlockedTiers": 0,
+          "path3NumBlockedTiers": 0,
+          "isHero": false
+        },
+        {
+          "tower": "BananaFarm",
+          "max": 3,
+          "path1NumBlockedTiers": 0,
+          "path2NumBlockedTiers": 0,
+          "path3NumBlockedTiers": 0,
+          "isHero": false
+        },
+        {
+          "tower": "MonkeyVillage",
+          "max": 3,
+          "path1NumBlockedTiers": 0,
+          "path2NumBlockedTiers": 0,
+          "path3NumBlockedTiers": 0,
+          "isHero": false
+        },
+        {
+          "tower": "EngineerMonkey",
+          "max": 3,
+          "path1NumBlockedTiers": 3,
+          "path2NumBlockedTiers": 0,
+          "path3NumBlockedTiers": 3,
+          "isHero": false
+        },
+        {
+          "tower": "IceMonkey",
+          "max": 3,
+          "path1NumBlockedTiers": 0,
+          "path2NumBlockedTiers": 0,
+          "path3NumBlockedTiers": 0,
+          "isHero": false
+        }
+      ],
+      "_defaultPowers": [
+        {
+          "name": "BananaFarmer",
+          "quantity": 2
+        },
+        {
+          "name": "MonkeyBoost",
+          "quantity": 3
+        },
+        {
+          "name": "RoadSpikes",
+          "quantity": 8
+        },
+        {
+          "name": "SuperMonkeyStorm",
+          "quantity": 3
+        },
+        {
+          "name": "DartTime",
+          "quantity": 2
+        },
+        {
+          "name": "TechBot",
+          "quantity": 2
+        },
+        {
+          "name": "TechBotPrime",
+          "quantity": 2
+        },
+        {
+          "name": "MonkeyBoostPro",
+          "quantity": 2
+        }
+      ],
+      "_defaultTowers": [
+        {
+          "name": "ObynGreenfoot",
+          "quantity": 1
+        },
+        {
+          "name": "WizardMonkey",
+          "quantity": 1
+        },
+        {
+          "name": "SuperMonkey",
+          "quantity": 1
+        },
+        {
+          "name": "NinjaMonkey",
+          "quantity": 1
+        },
+        {
+          "name": "Alchemist",
+          "quantity": 1
+        },
+        {
+          "name": "Druid",
+          "quantity": 1
+        },
+        {
+          "name": "Mermonkey",
+          "quantity": 1
+        }
+      ],
+      "maps": "https://data.ninjakiwi.com/btd6/odyssey/mrkd1iia/hard/maps"
+    },
+    "model": {
+      "name": "_btd6odysseymetadata",
+      "parameters": {
+        "id": {
+          "description": "Odyssey Event ID",
+          "type": "string"
+        },
+        "isExtreme": {
+          "description": "True when the Odyssey is extreme",
+          "type": "boolean"
+        },
+        "maxMonkeySeats": {
+          "description": "Maximum seats on the boat",
+          "type": "number"
+        },
+        "maxMonkeysOnBoat": {
+          "description": "Maximum towers",
+          "type": "number"
+        },
+        "maxPowerSlots": {
+          "description": "Maximum number of powers",
+          "type": "number"
+        },
+        "startingHealth": {
+          "description": "Voyage starting health",
+          "type": "number"
+        },
+        "_rewards": {
+          "description": "[!] Rewards list",
+          "type": "raw"
+        },
+        "_availablePowers": {
+          "description": "[!] Powers that can be chosen",
+          "type": "raw"
+        },
+        "_availableTowers": {
+          "description": "[!] Towers that can be chosen",
+          "type": "raw"
+        },
+        "_defaultPowers": {
+          "description": "[!] Default event powers",
+          "type": "raw"
+        },
+        "_defaultTowers": {
+          "description": "[!] Defauly Towers",
+          "type": "raw"
+        },
+        "maps": {
+          "description": "URL to map information",
+          "type": "string"
+        }
+      }
+    },
+    "next": null,
+    "prev": null
+  },
+  "maps_response": {
+    "error": null,
+    "success": true,
+    "body": [
+      {
+        "name": "Odyssey Map 1",
+        "createdAt": 0,
+        "id": "n/a",
+        "creator": null,
+        "gameVersion": "0",
+        "map": "SkullTweak",
+        "mapURL": "https://static-api.nkstatic.com/appdocs/4/assets/opendata/88a3a7ab6e31ff985bbe85bfb64e6624_MapSelectSkullTweakButton.png",
+        "mode": "Standard",
+        "difficulty": "Hard",
+        "disableDoubleCash": false,
+        "disableInstas": false,
+        "disableMK": false,
+        "disablePowers": false,
+        "disableSelling": false,
+        "startingCash": 650,
+        "abilityCooldownReductionMultiplier": 1,
+        "leastCashUsed": -1,
+        "leastTiersUsed": -1,
+        "noContinues": false,
+        "seed": 666,
+        "removeableCostMultiplier": 1,
+        "roundSets": [
+          "default"
+        ],
+        "lives": 100,
+        "maxLives": 5000,
+        "startRound": 3,
+        "endRound": 40,
+        "maxTowers": 9999,
+        "maxParagons": 10,
+        "plays": 0,
+        "wins": 0,
+        "restarts": 0,
+        "losses": 0,
+        "upvotes": 0,
+        "playsUnique": 0,
+        "winsUnique": 0,
+        "lossesUnique": 0,
+        "_powers": [],
+        "_bloonModifiers": {
+          "speedMultiplier": 1.5,
+          "moabSpeedMultiplier": 1,
+          "bossSpeedMultiplier": 1,
+          "regrowRateMultiplier": 1,
+          "healthMultipliers": {
+            "bloons": 1,
+            "moabs": 1,
+            "boss": 1
+          },
+          "allCamo": false,
+          "allRegen": false
+        },
+        "_towers": null
+      },
+      {
+        "name": "Odyssey Map 2",
+        "createdAt": 0,
+        "id": "n/a",
+        "creator": null,
+        "gameVersion": "0",
+        "map": "TheCabin",
+        "mapURL": "https://static-api.nkstatic.com/appdocs/4/assets/opendata/24e3162f4a580d88b3877bda98119c9c_MapSelectTheCabinButton.png",
+        "mode": "Standard",
+        "difficulty": "Hard",
+        "disableDoubleCash": false,
+        "disableInstas": false,
+        "disableMK": false,
+        "disablePowers": false,
+        "disableSelling": false,
+        "startingCash": 850,
+        "abilityCooldownReductionMultiplier": 1,
+        "leastCashUsed": -1,
+        "leastTiersUsed": -1,
+        "noContinues": false,
+        "seed": 666,
+        "removeableCostMultiplier": 1,
+        "roundSets": [
+          "default"
+        ],
+        "lives": 100,
+        "maxLives": 5000,
+        "startRound": 5,
+        "endRound": 60,
+        "maxTowers": 9999,
+        "maxParagons": 10,
+        "plays": 0,
+        "wins": 0,
+        "restarts": 0,
+        "losses": 0,
+        "upvotes": 0,
+        "playsUnique": 0,
+        "winsUnique": 0,
+        "lossesUnique": 0,
+        "_powers": [],
+        "_bloonModifiers": {
+          "speedMultiplier": 1.25,
+          "moabSpeedMultiplier": 1,
+          "bossSpeedMultiplier": 1,
+          "regrowRateMultiplier": 1.5,
+          "healthMultipliers": {
+            "bloons": 1,
+            "moabs": 1,
+            "boss": 1
+          },
+          "allCamo": false,
+          "allRegen": true
+        },
+        "_towers": null
+      },
+      {
+        "name": "Odyssey Map 3",
+        "createdAt": 0,
+        "id": "n/a",
+        "creator": null,
+        "gameVersion": "0",
+        "map": "Carved",
+        "mapURL": "https://static-api.nkstatic.com/appdocs/4/assets/opendata/8231d8857f3876951fdffcb1ea117870_MapSelectCarvedButton.png",
+        "mode": "DoubleMoabHealth",
+        "difficulty": "Hard",
+        "disableDoubleCash": false,
+        "disableInstas": false,
+        "disableMK": false,
+        "disablePowers": false,
+        "disableSelling": false,
+        "startingCash": 1050,
+        "abilityCooldownReductionMultiplier": 1,
+        "leastCashUsed": -1,
+        "leastTiersUsed": -1,
+        "noContinues": false,
+        "seed": 666,
+        "removeableCostMultiplier": 1,
+        "roundSets": [
+          "default"
+        ],
+        "lives": 100,
+        "maxLives": 5000,
+        "startRound": 7,
+        "endRound": 80,
+        "maxTowers": 9999,
+        "maxParagons": 10,
+        "plays": 0,
+        "wins": 0,
+        "restarts": 0,
+        "losses": 0,
+        "upvotes": 0,
+        "playsUnique": 0,
+        "winsUnique": 0,
+        "lossesUnique": 0,
+        "_powers": [],
+        "_bloonModifiers": {
+          "speedMultiplier": 1,
+          "moabSpeedMultiplier": 1,
+          "bossSpeedMultiplier": 1,
+          "regrowRateMultiplier": 1,
+          "healthMultipliers": {
+            "bloons": 1,
+            "moabs": 1,
+            "boss": 1
+          },
+          "allCamo": false,
+          "allRegen": false
+        },
+        "_towers": null
+      },
+      {
+        "name": "Odyssey Map 4",
+        "createdAt": 0,
+        "id": "n/a",
+        "creator": null,
+        "gameVersion": "0",
+        "map": "AdorasTemple",
+        "mapURL": "https://static-api.nkstatic.com/appdocs/4/assets/opendata/c2072720cceee3ab902b81ae39fa4aed_MapSelectAdorasTempleButton.png",
+        "mode": "AlternateBloonsRounds",
+        "difficulty": "Hard",
+        "disableDoubleCash": false,
+        "disableInstas": false,
+        "disableMK": false,
+        "disablePowers": false,
+        "disableSelling": false,
+        "startingCash": 1250,
+        "abilityCooldownReductionMultiplier": 1,
+        "leastCashUsed": -1,
+        "leastTiersUsed": -1,
+        "noContinues": false,
+        "seed": 666,
+        "removeableCostMultiplier": 1,
+        "roundSets": [
+          "default"
+        ],
+        "lives": 100,
+        "maxLives": 5000,
+        "startRound": 9,
+        "endRound": 90,
+        "maxTowers": 9999,
+        "maxParagons": 10,
+        "plays": 0,
+        "wins": 0,
+        "restarts": 0,
+        "losses": 0,
+        "upvotes": 0,
+        "playsUnique": 0,
+        "winsUnique": 0,
+        "lossesUnique": 0,
+        "_powers": [],
+        "_bloonModifiers": {
+          "speedMultiplier": 1,
+          "moabSpeedMultiplier": 1,
+          "bossSpeedMultiplier": 1,
+          "regrowRateMultiplier": 1,
+          "healthMultipliers": {
+            "bloons": 1,
+            "moabs": 1,
+            "boss": 1
+          },
+          "allCamo": false,
+          "allRegen": false
+        },
+        "_towers": null
+      },
+      {
+        "name": "Odyssey Map 5",
+        "createdAt": 0,
+        "id": "n/a",
+        "creator": null,
+        "gameVersion": "0",
+        "map": "DarkPath",
+        "mapURL": "https://static-api.nkstatic.com/appdocs/4/assets/opendata/4619bd30e17f501f17afad4af800045a_MapSelectDarkPathButton.png",
+        "mode": "Clicks",
+        "difficulty": "Hard",
+        "disableDoubleCash": false,
+        "disableInstas": false,
+        "disableMK": false,
+        "disablePowers": false,
+        "disableSelling": false,
+        "startingCash": 1500,
+        "abilityCooldownReductionMultiplier": 1,
+        "leastCashUsed": -1,
+        "leastTiersUsed": -1,
+        "noContinues": false,
+        "seed": 666,
+        "removeableCostMultiplier": 1,
+        "roundSets": [
+          "default"
+        ],
+        "lives": 1,
+        "maxLives": 5000,
+        "startRound": 11,
+        "endRound": 100,
+        "maxTowers": 9999,
+        "maxParagons": 10,
+        "plays": 0,
+        "wins": 0,
+        "restarts": 0,
+        "losses": 0,
+        "upvotes": 0,
+        "playsUnique": 0,
+        "winsUnique": 0,
+        "lossesUnique": 0,
+        "_powers": [],
+        "_bloonModifiers": {
+          "speedMultiplier": 1,
+          "moabSpeedMultiplier": 1,
+          "bossSpeedMultiplier": 1,
+          "regrowRateMultiplier": 1,
+          "healthMultipliers": {
+            "bloons": 1,
+            "moabs": 1,
+            "boss": 1
+          },
+          "allCamo": false,
+          "allRegen": false
+        },
+        "_towers": null
+      }
+    ],
+    "model": {
+      "name": "_btd6challengedocument",
+      "parameters": {
+        "name": {
+          "description": "Challenge Name",
+          "type": "string"
+        },
+        "createdAt": {
+          "description": "Challenge creation time in unix epoch milliseconds",
+          "type": "number"
+        },
+        "id": {
+          "description": "Unique Challenge ID",
+          "type": "string"
+        },
+        "creator": {
+          "description": "URL to the creators profile",
+          "type": "string"
+        },
+        "gameVersion": {
+          "description": "Version of the game this challenge was created in",
+          "type": "string"
+        },
+        "map": {
+          "description": "Map Name",
+          "type": "string"
+        },
+        "mapURL": {
+          "description": "URL to the map icon",
+          "type": "assetURL"
+        },
+        "mode": {
+          "description": "Game Mode",
+          "type": "string"
+        },
+        "difficulty": {
+          "description": "Challenge Difficulty",
+          "type": "string"
+        },
+        "disableDoubleCash": {
+          "description": "true when Double Cash Mode is disabled",
+          "type": "boolean"
+        },
+        "disableInstas": {
+          "description": "true when Instas are disabled",
+          "type": "boolean"
+        },
+        "disableMK": {
+          "description": "true when Monkey Knowledge is disabled",
+          "type": "boolean"
+        },
+        "disablePowers": {
+          "description": "true when Powers are disabled",
+          "type": "boolean"
+        },
+        "disableSelling": {
+          "description": "true when Selling is disabled",
+          "type": "boolean"
+        },
+        "startingCash": {
+          "description": "Starting cash value",
+          "type": "number"
+        },
+        "lives": {
+          "description": "Starting lives",
+          "type": "number"
+        },
+        "maxLives": {
+          "description": "Maximum allowed lives",
+          "type": "number"
+        },
+        "maxTowers": {
+          "description": "Maximum towers allowed",
+          "type": "number"
+        },
+        "maxParagons": {
+          "description": "Maximum paragons allowed",
+          "type": "number"
+        },
+        "startRound": {
+          "description": "Starting round",
+          "type": "number"
+        },
+        "endRound": {
+          "description": "End Round",
+          "type": "number"
+        },
+        "plays": {
+          "description": "Total number of attempts",
+          "type": "number"
+        },
+        "wins": {
+          "description": "Total number of wins",
+          "type": "number"
+        },
+        "losses": {
+          "description": "Total number of losses",
+          "type": "number"
+        },
+        "upvotes": {
+          "description": "Total number of upvotes",
+          "type": "number"
+        },
+        "playsUnique": {
+          "description": "Total number of unique attempts",
+          "type": "number"
+        },
+        "restarts": {
+          "description": "Total number of restarts",
+          "type": "number"
+        },
+        "winsUnique": {
+          "description": "Total number of unique player wins",
+          "type": "number"
+        },
+        "lossesUnique": {
+          "description": "Total number of unique player losses",
+          "type": "number"
+        },
+        "abilityCooldownReductionMultiplier": {
+          "description": "Ability Cooldown Multiplier",
+          "type": "number"
+        },
+        "leastCashUsed": {
+          "description": "Least Cash Used Setting",
+          "type": "number"
+        },
+        "leastTiersUsed": {
+          "description": "Least Tier Used",
+          "type": "number"
+        },
+        "noContinues": {
+          "description": "Are continues enabled",
+          "type": "number"
+        },
+        "seed": {
+          "description": "The RNG seed",
+          "type": "number"
+        },
+        "removeableCostMultiplier": {
+          "description": "Blocker removal cost multiplier",
+          "type": "number"
+        },
+        "roundSets": {
+          "description": "Bloon Round Information",
+          "type": "string[]"
+        },
+        "_powers": {
+          "description": "[!] Power restrictions",
+          "type": "raw"
+        },
+        "_bloonModifiers": {
+          "description": "[!] Bloon Modifiers",
+          "type": "raw"
+        },
+        "_towers": {
+          "description": "[!] Tower restrictions",
+          "type": "raw"
+        }
+      }
+    },
+    "next": null,
+    "prev": null
+  }
+}

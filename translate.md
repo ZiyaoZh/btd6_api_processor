@@ -30,6 +30,7 @@
 | Geraldo | 杰拉尔多 |
 | Corvus | 科沃斯 |
 | Silas | 西拉斯 |
+| ChosenPrimaryHero | 自选英雄 |
 
 ---
 
@@ -72,6 +73,7 @@
 | MonkeyMeadow | 猴子草甸 |
 | InTheLoop | 循环 |
 | ThreeMilesRound | 三矿回合 |
+| ThreeMinesAround | 三矿环绕 |
 | MiddleOfTheRoad | 道路中间 |
 | TinkerTon | 汀克顿 |
 | SpaPits | 水疗温泉 |
@@ -152,6 +154,7 @@
 | MuddyPuddles | 泥泞的水坑 |
 | Ouch | #哎哟 |
 | TrickyTracks | 棘手的轨道 |
+| SkullTweak | 骷髅变奏 |
 ---
 
 ## 6. 地图类型
@@ -177,10 +180,12 @@
 | Reverse | 相反 |
 | MagicMonkeysOnly | 仅魔法 |
 | DoubleHpMoabs | 双倍生命 |
+| DoubleMoabHealth | 双倍MOAB生命 |
 | HalfCash | 现金减半 |
 | AlternateBloonsRounds | 替代气球 |
 | Impoppable | 极难 |
 | CHIMPS | 点击 |
+| Clicks | 点击（CHIMPS） |
 
 ---
 
@@ -193,4 +198,67 @@
 | Vortex | 漩涡 |
 | Phayze | 菲茨 |
 | Blastapopoulos | 轰炸飞艇 |
-| Diamondback | 菱背
+| Diamondback | 菱背 |
+
+---
+
+## 9. 力量
+
+| 英文 | 中文 |
+|------|------|
+| BananaFarmer | 香蕉农夫 |
+| CamoTrap | 迷彩陷阱 |
+| CashDrop | 现金补给 |
+| GlueTrap | 胶水陷阱 |
+| MoabMine | MOAB地雷 |
+| MonkeyBoost | 猴子强化 |
+| Pontoon | 浮桥 |
+| PortableLake | 便携湖 |
+| RoadSpikes | 路钉 |
+| SuperMonkeyStorm | 超猴风暴 |
+| Thrive | 茁壮成长 |
+| DartTime | 飞镖时间 |
+| EnergisingTotem | 活力图腾 |
+| TechBot | 技术机器人 |
+| CaveMonkey | 洞穴猴 |
+| BananaFarmerPro | 高级香蕉农夫 |
+| SuperMonkeyBeacon | 超猴信标 |
+| TechBotPrime | 高级技术机器人 |
+| MonkeyBoostPro | 高级猴子强化 |
+| PortableLakePro | 高级便携湖 |
+
+---
+
+## 10. 奖励
+
+| 英文 | 中文 |
+|------|------|
+| MonkeyMoney | 猴钞 |
+| CollectionEvent | 收集物 |
+| InstaMonkey | Insta猴 |
+| Power | 力量 |
+
+---
+
+## 11. 塔类别
+
+| 英文 | 中文 |
+|------|------|
+| Hero | 英雄 |
+| Primary | 初级 |
+| Military | 军事 |
+| Magic | 魔法 |
+| Support | 支持 |
+| Unknown | 未分类 |
+
+---
+
+## 12. 规则标签
+
+| 英文 | 中文 |
+|------|------|
+| Unlimited | 无限制 |
+| Disabled | 禁用 |
+| Extreme | 极限模式 |
+| AllCamo | 全迷彩 |
+| AllRegen | 全重生 |

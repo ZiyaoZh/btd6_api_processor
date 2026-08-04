@@ -16,6 +16,8 @@
 - 获取 BTD6 官方 Open Data 原始数据。
 - 输出活动简报（summary）。
 - 输出最新一期详细信息（detail）：race / boss / odyssey / daily。
+- 规范化并缓存 `ActivitySnapshot` JSON，详情 Markdown 和活动图片共用同一数据源。
+- 生成确定性活动情报图（brief-image）：race / odyssey，使用真实 `mapURL` 地图资产。
 - 输出排行榜（leaderboard）：
   - markdown 文本榜单
   - image 图片榜单（适合社群转发）
@@ -38,15 +40,23 @@
 ├── btd6_core/
 │   ├── common.py              # 通用工具：翻译、时间、格式化
 │   ├── cache_store.py         # 缓存索引与文件读写
+│   ├── activity_models.py     # ActivitySnapshot 领域模型
+│   ├── activity_repository.py # 事件选择、metadata/maps 抓取、资产与 JSON 缓存
+│   ├── activity_formatter.py  # 快照到 Markdown
+│   ├── activity_renderer.py   # 竞速/征程动态 Pillow 排版
+│   ├── activity_brief_service.py # 情报图缓存服务
 │   ├── summary_service.py     # 简报生成
 │   ├── detail_service.py      # 详情生成
 │   ├── leaderboard_service.py # 排行榜生成
-│   ├── image_renderer.py      # PNG 排行榜渲染
+│   ├── image_renderer.py      # PNG 排行榜渲染与字体加载
 │   └── update_service.py      # 全量更新流程
 ├── translate.md               # 翻译映射表
 ├── output/                    # 所有输出根目录（运行时自动创建）
 │   ├── cache_index.json       # 缓存索引
 │   ├── summary/               # 简报输出
+│   ├── snapshots/             # 规范化活动 JSON
+│   ├── briefs/                # 确定性活动情报图
+│   ├── assets/maps/           # mapURL 地图资产缓存
 │   ├── race/ boss/ odyssey/ daily/ # 详情与排行榜输出
 │   └── collection_event/      # 收集活动缓存输出
 ├── assets/fonts/              # 图片渲染字体缓存
@@ -79,6 +89,8 @@ export NK_API_KEY="your_api_key"
 
 也可以每次通过 `--api-key` 传入。
 
+活动详情与情报图默认以 UTC+8 显示时间；原始快照仍保存 API 毫秒时间戳。可用 `BTD6_DISPLAY_UTC_OFFSET_HOURS` 覆盖显示偏移（范围 `-12` 到 `14`）。
+
 ---
 
 ## 4. 命令行接口（CLI）
@@ -94,7 +106,9 @@ python btd6_cli.py --help
 - `--api-key`：Ninja Kiwi API Key，可选。
 - `--translate`：翻译表路径，默认 `translate.md`。
 - `--output`：主输出文件路径，默认 `output/btd6_digest.md`。
-- `--mode`：模式，可选 `summary` / `detail` / `leaderboard` / `collection-event` / `update`。
+- `--mode`：模式，可选 `summary` / `detail` / `brief-image` / `leaderboard` / `collection-event` / `update`。
+- `--event-scope`：`current` / `upcoming` / `latest`；detail 默认 `latest`，brief-image 默认 `current`。
+- `--difficulty`：征程难度 `easy` / `medium` / `hard`，默认 `hard`。
 - `--collection-event-output`：collection-event 模式的 JSON 输出路径，默认 `output/collection_event_schedule.json`。
 - `--collection-event-image-output`：collection-event 模式的图片输出路径，默认 `output/collection_event_schedule.png`。
 - `--only-upcoming`：collection-event 模式仅输出当前和未来轮换。
@@ -128,8 +142,24 @@ python btd6_cli.py \
 说明：
 - 若只传一个类型，输出该类型详情。
 - 若传多个类型，主输出会包含每个类型的文件路径和合并内容。
+- 每份详情同时生成并声明对应的结构化快照 JSON。
 
-### 4.4 leaderboard 模式（按需缓存）
+### 4.4 brief-image 模式（按需缓存）
+
+使用真实地图缩略图与结构化规则生成确定性纵向 PNG。首版支持竞速和征程；征程必须明确一个难度。
+
+```bash
+python btd6_cli.py \
+  --mode brief-image \
+  --activity-type odyssey \
+  --difficulty hard \
+  --event-scope current \
+  --output output/odyssey_brief_result.md
+```
+
+主输出是执行摘要与 Markdown 详情，使用 `# JSON:` 和 `# 图片:` 声明实际快照和 PNG 路径。
+
+### 4.5 leaderboard 模式（按需缓存）
 
 生成排行榜（当前实现固定从第一页起拉取，内部按类型取固定人数）。
 
@@ -162,7 +192,7 @@ python btd6_cli.py \
 - 图片榜单仅显示：排行、玩家、得分。
 - 图片底部左侧显示数据来源，右侧显示数据获取时间（`YYYY-MM-DD HH:MM:SS`）。
 
-### 4.5 update 模式（主动刷新）
+### 4.6 update 模式（主动刷新）
 
 一键更新所有核心数据：
 - 简报：summary
@@ -175,7 +205,7 @@ python btd6_cli.py \
   --output output/update.md
 ```
 
-### 4.6 collection-event 模式（收集活动轮换）
+### 4.7 collection-event 模式（收集活动轮换）
 
 生成 collection event 的轮换 JSON 与图片。会优先读取缓存中的 JSON 和图片；如果缓存不存在或已过期，才会现场生成并写入缓存。图片图标默认读取 `assets/InstaMonkeyIcon/`，字体优先使用 `assets/fonts/Gardenia-Bold.woff2`，其次会按 `assets/fonts/` 下的其他本地字体回退。
 
@@ -205,7 +235,13 @@ python btd6_cli.py \
 
 - `output/summary/latest_summary.md`
 
-### 5.3 排行榜输出
+### 5.3 活动快照与情报图
+
+- `output/snapshots/{activity_type}/{event_id}_{variant}_{event_scope}.json`
+- `output/briefs/race/{event_id}_default_{event_scope}.png`
+- `output/briefs/odyssey/{event_id}_{difficulty}_{event_scope}.png`
+
+### 5.4 排行榜输出
 
 Markdown：
 - `output/race/{event_id}_top100.md`
@@ -217,12 +253,12 @@ Image：
 - `output/boss/{event_id}_standard_top150.png`
 - `output/boss/{event_id}_elite_top150.png`
 
-### 5.4 固定人数策略（image）
+### 5.5 固定人数策略（image）
 
 - Race：固定前 100 人（取前 2 页并截断）。
 - Boss：固定前 150 人（尝试前 6 页并截断）。
 
-### 5.5 collection-event 缓存输出
+### 5.6 collection-event 缓存输出
 
 - `output/collection_event/latest_collection_event.json`
 - `output/collection_event/latest_collection_event.png`
@@ -262,7 +298,7 @@ Image：
 ```
 
 读取逻辑：
-- `summary` / `detail` / `leaderboard` / `collection-event` 模式优先读取缓存文件。
+- `summary` / `detail` / `brief-image` / `leaderboard` / `collection-event` 模式优先读取缓存文件。
 - 缓存不存在或超过 10 分钟 TTL 时，会自动请求远程并覆盖缓存。
 - 如果远程请求失败且本地仍有旧缓存，会自动回退到旧缓存继续服务。
 - `update` 会强制回源并刷新全部缓存。

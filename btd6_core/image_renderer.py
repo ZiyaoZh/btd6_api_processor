@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from datetime import datetime
-from math import ceil
 from pathlib import Path
 from typing import Any
 from urllib import request
