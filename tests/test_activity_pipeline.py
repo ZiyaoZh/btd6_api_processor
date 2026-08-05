@@ -11,17 +11,21 @@ from unittest.mock import patch
 
 from PIL import Image, ImageDraw, ImageStat
 
-from btd6_core.activity_brief_service import resolve_activity_brief
+from btd6_core.activity_brief_service import (
+    resolve_activity_brief,
+    resolve_activity_overview,
+)
 from btd6_core.activity_formatter import (
     challenge_limit_label,
     format_activity_snapshot,
     format_activity_time,
 )
-from btd6_core.activity_models import ActivityAsset, BloonModifiers
+from btd6_core.activity_models import ActivityAsset, ActivitySnapshot, BloonModifiers
 from btd6_core.activity_renderer import (
     _draw_text_in_rect,
     _paste_map,
     render_activity_brief,
+    render_activity_overview,
 )
 from btd6_core.activity_repository import (
     ActivityRepository,
@@ -351,6 +355,7 @@ class ActivityPipelineTests(unittest.TestCase):
             boss_path = root / "boss.png"
             odyssey_path = root / "odyssey.png"
             daily_path = root / "daily.png"
+            overview_path = root / "overview.png"
             odyssey_base_path = root / "odyssey_base.png"
             odyssey_rules_path = root / "odyssey_rules.png"
             standard = replace(race.challenges[0], label="standard")
@@ -390,6 +395,12 @@ class ActivityPipelineTests(unittest.TestCase):
             render_activity_brief(boss, boss_path)
             render_activity_brief(odyssey, odyssey_path)
             render_activity_brief(daily, daily_path)
+            render_activity_overview(
+                [race, boss, odyssey, daily],
+                overview_path,
+                difficulty="hard",
+                event_scope="current",
+            )
 
             assert odyssey.odyssey is not None
             base_map = odyssey.odyssey.maps[0]
@@ -442,6 +453,11 @@ class ActivityPipelineTests(unittest.TestCase):
             with Image.open(daily_path) as image:
                 self.assertEqual(image.width, 1080)
                 self.assertGreater(image.height, 900)
+                self.assertGreater(sum(ImageStat.Stat(image).var), 100)
+            with Image.open(overview_path) as image:
+                self.assertEqual(image.width, 1080)
+                self.assertGreater(image.height, 1200)
+                self.assertLess(image.height, 1800)
                 self.assertGreater(sum(ImageStat.Stat(image).var), 100)
             with Image.open(odyssey_base_path) as base_image, Image.open(
                 odyssey_rules_path
@@ -547,6 +563,81 @@ class ActivityPipelineTests(unittest.TestCase):
         self.assertNotEqual(image_path, legacy_image)
         render.assert_called_once()
         self.assertIn("activity-brief:v3:race:default:current", index_data["items"])
+
+    def test_activity_overview_renders_available_types_when_one_type_fails(self) -> None:
+        fixture = _fixture("race_end_of_line.json")
+        event = fixture["list_response"]["body"][0]
+        race = ActivityRepository(
+            _race_client(),  # type: ignore[arg-type]
+            TRANSLATIONS,
+            asset_fetcher=StaticAssetFetcher(),
+            now_ms=event["start"] + 1,
+        ).fetch_snapshot("race", event_scope="current")
+        available = {
+            "race": race,
+            "odyssey": replace(
+                race,
+                activity_type="odyssey",
+                event_id="odyssey_fixture",
+                name="Fixture Odyssey",
+            ),
+            "daily": replace(
+                race,
+                activity_type="daily",
+                event_id="daily_fixture",
+                name="Fixture Daily",
+                start_at=None,
+                end_at=None,
+                attributes={"created_at": event["start"]},
+            ),
+        }
+
+        def resolve_snapshot(
+            _client: object,
+            _translations: object,
+            activity_type: str,
+            **_kwargs: object,
+        ) -> tuple[Path, ActivitySnapshot, bool]:
+            if activity_type == "boss":
+                raise RuntimeError("fixture boss unavailable")
+            return Path(f"{activity_type}.json"), available[activity_type], True
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_root = Path(temp_dir)
+            with (
+                patch(
+                    "btd6_core.activity_brief_service.resolve_activity_snapshot",
+                    side_effect=resolve_snapshot,
+                ) as resolve,
+                patch(
+                    "btd6_core.activity_brief_service.OUTPUT_DIR",
+                    output_root,
+                ),
+                patch(
+                    "btd6_core.activity_brief_service.load_index",
+                    return_value={"items": {}},
+                ),
+                patch("btd6_core.activity_brief_service.save_index"),
+            ):
+                manifest_path, image_path, report, cached = resolve_activity_overview(
+                    FailingClient(),  # type: ignore[arg-type]
+                    TRANSLATIONS,
+                    difficulty="hard",
+                    event_scope="current",
+                )
+
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            with Image.open(image_path) as image:
+                image_size = image.size
+
+        self.assertEqual(resolve.call_count, 4)
+        self.assertFalse(cached)
+        self.assertEqual(manifest["activity_type"], "all")
+        self.assertEqual(len(manifest["activities"]), 3)
+        self.assertIn("boss", manifest["errors"])
+        self.assertIn("Boss: 暂未取得活动数据", report)
+        self.assertEqual(image_size[0], 1080)
+        self.assertGreater(image_size[1], 1200)
 
 
 if __name__ == "__main__":

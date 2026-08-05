@@ -17,7 +17,7 @@
 - 输出活动简报（summary）。
 - 输出最新一期详细信息（detail）：race / boss / odyssey / daily。
 - 规范化并缓存 `ActivitySnapshot` JSON，详情 Markdown 和活动图片共用同一数据源。
-- 生成确定性活动情报图（brief-image）：race / boss / odyssey / daily，使用真实 `mapURL` 地图资产。
+- 生成确定性活动情报图（brief-image）：race / boss / odyssey / daily 单项详图，以及 all 四类活动总览图，使用真实 `mapURL` 地图资产。
 - 输出排行榜（leaderboard）：
   - markdown 文本榜单
   - image 图片榜单（适合社群转发）
@@ -147,7 +147,7 @@ python btd6_cli.py \
 
 ### 4.4 brief-image 模式（按需缓存）
 
-使用真实地图缩略图与结构化规则生成确定性纵向 PNG，支持竞速、Boss、征程和每日挑战；征程必须明确一个难度。
+使用真实地图缩略图与结构化规则生成确定性纵向 PNG，支持竞速、Boss、征程和每日挑战的单项详图；`all` 生成适合每日早报的一张四类活动简洁总览图。征程及总览必须明确一个征程难度。
 
 ```bash
 python btd6_cli.py \
@@ -156,6 +156,17 @@ python btd6_cli.py \
   --difficulty hard \
   --event-scope current \
   --output output/odyssey_brief_result.md
+```
+
+每日活动总览图：
+
+```bash
+python btd6_cli.py \
+  --mode brief-image \
+  --activity-type all \
+  --difficulty hard \
+  --event-scope current \
+  --output output/daily_activity_overview_result.md
 ```
 
 主输出是执行摘要与 Markdown 详情，使用 `# JSON:` 和 `# 图片:` 声明实际快照和 PNG 路径。

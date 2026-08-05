@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from collections import defaultdict
 import re
+import time
+from collections import defaultdict
+from collections.abc import Callable, Iterable
 from pathlib import Path
-from typing import Iterable
 
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 
@@ -24,12 +25,12 @@ from btd6_core.activity_models import (
 from btd6_core.cache_store import PROJECT_ROOT
 from btd6_core.image_renderer import _load_font
 
-
 WIDTH = 1080
 MAX_HEIGHT = 16000
 MARGIN = 46
 CONTENT_WIDTH = WIDTH - MARGIN * 2
 ACTIVITY_BRIEF_RENDER_VERSION = "v3"
+ACTIVITY_OVERVIEW_RENDER_VERSION = "v2"
 ACTIVITY_ASSET_DIR = PROJECT_ROOT / "assets" / "activity_brief"
 HEADER_BANNER_PATHS = {
     "race": ACTIVITY_ASSET_DIR / "race_banner.png",
@@ -39,6 +40,20 @@ BACKGROUND_PATTERN_PATH = ACTIVITY_ASSET_DIR / "hex_pattern.png"
 HEADER_ART_HEIGHT = 300
 FEATURE_MAP_SIZE = (372, 248)
 ROW_MAP_SIZE = (304, 203)
+OVERVIEW_MAP_SIZE = (300, 200)
+OVERVIEW_ACTIVITY_TYPES = ("race", "boss", "odyssey", "daily")
+OVERVIEW_LABELS = {
+    "race": "竞速",
+    "boss": "Boss",
+    "odyssey": "征程",
+    "daily": "每日挑战",
+}
+OVERVIEW_ACCENTS = {
+    "race": "#35d1c2",
+    "boss": "#ff6b6b",
+    "odyssey": "#9b7bd1",
+    "daily": "#ffcf45",
+}
 
 COLORS = {
     "background": "#0d141a",
@@ -580,6 +595,330 @@ def render_activity_brief(snapshot: ActivitySnapshot, output_path: Path) -> None
     if renderer_type is None:
         raise ValueError("活动情报图仅支持 race、boss、odyssey、daily")
     renderer_type().render(snapshot, output_path)
+
+
+def render_activity_overview(
+    snapshots: Iterable[ActivitySnapshot],
+    output_path: Path,
+    *,
+    errors: dict[str, str] | None = None,
+    difficulty: str = "hard",
+    event_scope: str = "current",
+) -> None:
+    snapshot_by_type = {item.activity_type: item for item in snapshots}
+    error_by_type = errors or {}
+    fallback_banner = next(
+        (
+            _resolve_asset_path(item.challenges[0].map_asset.local_path)
+            for item in snapshot_by_type.values()
+            if item.challenges
+            and _resolve_asset_path(item.challenges[0].map_asset.local_path) is not None
+        ),
+        None,
+    )
+    image = _create_background("all", fallback_banner)
+    draw = ImageDraw.Draw(image)
+    fonts: dict[int, ImageFont.ImageFont] = {}
+
+    def font(size: int) -> ImageFont.ImageFont:
+        if size not in fonts:
+            fonts[size] = _load_font(size)
+        return fonts[size]
+
+    y = 38
+    _draw_text_top(
+        draw,
+        (MARGIN, y),
+        "每日早报",
+        font=font(28),
+        fill=COLORS["accent"],
+    )
+    y += 43
+    _draw_text_top(
+        draw,
+        (MARGIN, y),
+        "BTD6 活动总览",
+        font=font(54),
+        fill=COLORS["yellow"],
+    )
+    y += 72
+    scope_label = {
+        "current": "当前活动",
+        "upcoming": "下一期活动",
+        "latest": "最新发布",
+    }.get(event_scope, "活动总览")
+    difficulty_label = {"easy": "简单", "medium": "中级", "hard": "困难"}.get(
+        difficulty,
+        difficulty,
+    )
+    subtitle = f"{scope_label}  ·  征程{difficulty_label}难度  ·  竞速 / Boss / 征程 / 每日挑战"
+    _draw_text_top(
+        draw,
+        (MARGIN, y),
+        _truncate_text(draw, subtitle, font(23), CONTENT_WIDTH),
+        font=font(23),
+        fill=COLORS["muted"],
+    )
+    fetched_dates = sorted(
+        {
+            item.fetched_at[:10]
+            for item in snapshot_by_type.values()
+            if len(item.fetched_at) >= 10
+        }
+    )
+    if fetched_dates:
+        y += 38
+        _draw_text_top(
+            draw,
+            (MARGIN, y),
+            f"数据日期  {fetched_dates[-1]}",
+            font=font(21),
+            fill=COLORS["muted"],
+        )
+    y = max(y + 54, HEADER_ART_HEIGHT + 12)
+
+    for activity_type in OVERVIEW_ACTIVITY_TYPES:
+        snapshot = snapshot_by_type.get(activity_type)
+        y = _draw_overview_card(
+            image,
+            draw,
+            y,
+            activity_type,
+            snapshot,
+            error=error_by_type.get(activity_type, ""),
+            font=font,
+        )
+
+    y += 8
+    draw.line((MARGIN, y, WIDTH - MARGIN, y), fill=COLORS["border"], width=1)
+    y += 15
+    footer_font = font(19)
+    _draw_text_top(
+        draw,
+        (MARGIN, y),
+        "数据来源  Ninja Kiwi Open Data API",
+        font=footer_font,
+        fill=COLORS["muted"],
+    )
+    credit = "图片生成  小污猫"
+    credit_width = draw.textlength(credit, font=footer_font)
+    _draw_text_top(
+        draw,
+        (WIDTH - MARGIN - credit_width, y),
+        credit,
+        font=footer_font,
+        fill=COLORS["muted"],
+    )
+    y += _line_height(draw, footer_font) + 30
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    image.crop((0, 0, WIDTH, max(320, y))).save(
+        output_path,
+        format="PNG",
+        optimize=True,
+    )
+
+
+def _draw_overview_card(
+    image: Image.Image,
+    draw: ImageDraw.ImageDraw,
+    top: int,
+    activity_type: str,
+    snapshot: ActivitySnapshot | None,
+    *,
+    error: str,
+    font: Callable[[int], ImageFont.ImageFont],
+) -> int:
+    height = 236
+    bottom = top + height
+    accent = OVERVIEW_ACCENTS.get(activity_type, COLORS["accent"])
+    draw.rounded_rectangle(
+        (MARGIN, top, WIDTH - MARGIN, bottom),
+        radius=7,
+        fill=COLORS["surface"],
+        outline=COLORS["border"],
+        width=1,
+    )
+    draw.rectangle((MARGIN, top + 8, MARGIN + 6, bottom - 8), fill=accent)
+    map_box = (
+        MARGIN + 18,
+        top + 18,
+        MARGIN + 18 + OVERVIEW_MAP_SIZE[0],
+        top + 18 + OVERVIEW_MAP_SIZE[1],
+    )
+    challenge = snapshot.challenges[0] if snapshot and snapshot.challenges else None
+    if challenge is not None:
+        _paste_map(image, draw, challenge, map_box, font(22))
+    else:
+        draw.rounded_rectangle(
+            map_box,
+            radius=8,
+            fill="#0a1116",
+            outline=COLORS["border"],
+            width=2,
+        )
+        _draw_text_in_rect(
+            draw,
+            (map_box[0] + 14, map_box[1], map_box[2] - 14, map_box[3]),
+            "暂无地图数据",
+            font=font(22),
+            fill=COLORS["muted"],
+            align="center",
+        )
+
+    content_x = MARGIN + 342
+    content_width = WIDTH - MARGIN - content_x - 18
+    label = OVERVIEW_LABELS.get(activity_type, activity_type)
+    _draw_text_top(
+        draw,
+        (content_x, top + 16),
+        label,
+        font=font(25),
+        fill=accent,
+    )
+    status = _overview_status_label(_overview_snapshot_status(snapshot))
+    status_font = font(19)
+    status_width = int(draw.textlength(status, font=status_font)) + 24
+    status_x = WIDTH - MARGIN - 18 - status_width
+    draw.rounded_rectangle(
+        (status_x, top + 14, status_x + status_width, top + 48),
+        radius=5,
+        fill=COLORS["surface_alt"],
+        outline=accent,
+        width=1,
+    )
+    _draw_text_in_rect(
+        draw,
+        (status_x + 12, top + 14, status_x + status_width - 10, top + 48),
+        status,
+        font=status_font,
+        fill=COLORS["text"],
+    )
+
+    if snapshot is None:
+        _draw_text_top(
+            draw,
+            (content_x, top + 70),
+            "暂未取得活动数据",
+            font=font(31),
+            fill=COLORS["text"],
+        )
+        message = "数据接口或缓存暂时不可用，请稍后再看。" if error else "当前范围没有可用活动。"
+        _draw_text_top(
+            draw,
+            (content_x, top + 125),
+            _truncate_text(draw, message, font(22), content_width),
+            font=font(22),
+            fill=COLORS["muted"],
+        )
+        return bottom + 16
+
+    title = _truncate_text(draw, snapshot.name or "未命名活动", font(31), content_width)
+    _draw_text_top(
+        draw,
+        (content_x, top + 63),
+        title,
+        font=font(31),
+        fill=COLORS["yellow"],
+    )
+    time_text = _overview_time_text(snapshot)
+    _draw_text_top(
+        draw,
+        (content_x, top + 108),
+        _truncate_text(draw, time_text, font(21), content_width),
+        font=font(21),
+        fill=COLORS["muted"],
+    )
+    primary, secondary = _overview_fact_lines(snapshot, challenge)
+    _draw_text_top(
+        draw,
+        (content_x, top + 149),
+        _truncate_text(draw, primary, font(23), content_width),
+        font=font(23),
+        fill=COLORS["text"],
+    )
+    _draw_text_top(
+        draw,
+        (content_x, top + 188),
+        _truncate_text(draw, secondary, font(21), content_width),
+        font=font(21),
+        fill=COLORS["muted"],
+    )
+    return bottom + 16
+
+
+def _overview_status_label(status: str) -> str:
+    return {
+        "current": "进行中",
+        "upcoming": "即将开始",
+        "ended": "已结束",
+        "missing": "暂无数据",
+    }.get(status, "状态未知")
+
+
+def _overview_snapshot_status(snapshot: ActivitySnapshot | None) -> str:
+    if snapshot is None:
+        return "missing"
+    now_ms = int(time.time() * 1000)
+    if snapshot.start_at is not None and now_ms < snapshot.start_at:
+        return "upcoming"
+    if snapshot.end_at is not None and now_ms > snapshot.end_at:
+        return "ended"
+    if snapshot.start_at is not None:
+        return "current"
+    return snapshot.status
+
+
+def _overview_time_text(snapshot: ActivitySnapshot) -> str:
+    if snapshot.start_at is not None or snapshot.end_at is not None:
+        return (
+            f"{format_activity_time(snapshot.start_at)}  至  "
+            f"{format_activity_time(snapshot.end_at)}  UTC{activity_timezone_label()}"
+        )
+    created_at = snapshot.attributes.get("created_at")
+    if isinstance(created_at, int) and not isinstance(created_at, bool):
+        return f"发布于 {format_activity_time(created_at)}  UTC{activity_timezone_label()}"
+    return "活动时间暂未提供"
+
+
+def _overview_fact_lines(
+    snapshot: ActivitySnapshot,
+    challenge: ChallengeConfig | None,
+) -> tuple[str, str]:
+    if snapshot.activity_type == "odyssey" and snapshot.odyssey is not None:
+        odyssey = snapshot.odyssey
+        map_count = len(odyssey.maps)
+        mode = "极限模式" if odyssey.is_extreme else "普通模式"
+        first_map = odyssey.maps[0].map_name if odyssey.maps else "地图待公布"
+        return (
+            f"{odyssey.difficulty_name} · {mode} · {map_count} 张地图",
+            f"首站  {first_map}",
+        )
+    if snapshot.activity_type == "boss":
+        boss_name = str(snapshot.attributes.get("boss_type_name", "") or "Boss 类型未知")
+        map_name = challenge.map_name if challenge else "地图待公布"
+        rounds = _overview_rounds(challenge)
+        return f"{boss_name} · {map_name}", f"标准 / 精英  ·  {rounds}"
+    if challenge is None:
+        return "地图与模式待公布", "详细规则暂未提供"
+    difficulty = challenge.difficulty_name or challenge.difficulty_id or "难度未知"
+    mode = challenge.mode_name or challenge.mode_id or "模式未知"
+    if snapshot.activity_type == "daily":
+        return (
+            f"{challenge.map_name or '地图待公布'} · {difficulty}",
+            f"{mode}  ·  {_overview_rounds(challenge)}",
+        )
+    return (
+        f"{challenge.map_name or '地图待公布'} · {mode}",
+        f"{difficulty}  ·  {_overview_rounds(challenge)}",
+    )
+
+
+def _overview_rounds(challenge: ChallengeConfig | None) -> str:
+    if challenge is None:
+        return "回合待公布"
+    if challenge.start_round is None and challenge.end_round is None:
+        return "回合待公布"
+    return f"第 {_show(challenge.start_round)} - {_show(challenge.end_round)} 回合"
 
 
 class RaceBriefRenderer:

@@ -9,7 +9,10 @@ import sys
 from pathlib import Path
 
 from api_raw_fetcher import ApiClient
-from btd6_core.activity_brief_service import resolve_activity_brief
+from btd6_core.activity_brief_service import (
+    resolve_activity_brief,
+    resolve_activity_overview,
+)
 from btd6_core.activity_repository import resolve_activity_snapshot
 from btd6_core.cache_store import resolve_project_path
 from btd6_core.collection_event_service import resolve_collection_event
@@ -44,9 +47,9 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--activity-type",
-        choices=["race", "boss", "odyssey", "daily"],
+        choices=["race", "boss", "odyssey", "daily", "all"],
         default="race",
-        help="brief-image 模式的活动类型。",
+        help="brief-image 模式的活动类型；all 生成四类活动总览图。",
     )
     parser.add_argument(
         "--difficulty",
@@ -143,14 +146,23 @@ def main() -> int:
 
         elif args.mode == "brief-image":
             event_scope = args.event_scope or "current"
-            snapshot_path, image_path, content, cached = resolve_activity_brief(
-                client,
-                trans,
-                args.activity_type,
-                difficulty=args.difficulty,
-                event_scope=event_scope,
-                refresh=False,
-            )
+            if args.activity_type == "all":
+                snapshot_path, image_path, content, cached = resolve_activity_overview(
+                    client,
+                    trans,
+                    difficulty=args.difficulty,
+                    event_scope=event_scope,
+                    refresh=False,
+                )
+            else:
+                snapshot_path, image_path, content, cached = resolve_activity_brief(
+                    client,
+                    trans,
+                    args.activity_type,
+                    difficulty=args.difficulty,
+                    event_scope=event_scope,
+                    refresh=False,
+                )
             report = "\n".join(
                 [
                     f"# 来源: {'缓存' if cached else '远程/渲染'}",
