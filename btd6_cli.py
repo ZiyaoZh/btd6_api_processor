@@ -13,6 +13,7 @@ from btd6_core.activity_brief_service import (
     resolve_activity_brief,
     resolve_activity_overview,
 )
+from btd6_core.activity_discovery_service import discover_activities
 from btd6_core.activity_repository import resolve_activity_snapshot
 from btd6_core.cache_store import resolve_project_path
 from btd6_core.collection_event_service import resolve_collection_event
@@ -30,9 +31,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output", default="output/btd6_digest.md", help="输出文件路径")
     parser.add_argument(
         "--mode",
-        choices=["summary", "detail", "brief-image", "leaderboard", "collection-event", "update"],
+        choices=["summary", "detail", "brief-image", "leaderboard", "collection-event", "discover", "update"],
         default="summary",
-        help="输出模式：summary=简报，detail=活动详情，brief-image=确定性活动情报图，leaderboard=排行榜，collection-event=收集活动轮换，update=手动更新所有数据",
+        help="输出模式：summary=简报，detail=活动详情，brief-image=确定性活动情报图，leaderboard=排行榜，collection-event=收集活动轮换，discover=轻量活动发现，update=手动更新所有数据",
     )
     parser.add_argument(
         "--detail-types",
@@ -59,9 +60,9 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--event-scope",
-        choices=["current", "upcoming", "latest"],
+        choices=["current", "upcoming", "ended", "relevant", "latest"],
         default=None,
-        help="活动范围：当前、下一期或列表中开始时间最新的一期；detail 默认 latest，brief-image 默认 current。",
+        help="活动范围：当前、下一期、最近结束、当前相关或旧版 latest；detail 默认 latest，all 总览默认 relevant。",
     )
     parser.add_argument(
         "--leaderboard-format",
@@ -145,7 +146,9 @@ def main() -> int:
                 report = "\n".join(summary)
 
         elif args.mode == "brief-image":
-            event_scope = args.event_scope or "current"
+            event_scope = args.event_scope or (
+                "relevant" if args.activity_type == "all" else "current"
+            )
             if args.activity_type == "all":
                 snapshot_path, image_path, content, cached = resolve_activity_overview(
                     client,
@@ -202,6 +205,19 @@ def main() -> int:
 
         elif args.mode == "update":
             report = update_all_data(client, trans)
+
+        elif args.mode == "discover":
+            discovery_path, discovery = discover_activities(client, trans)
+            changed = "、".join(discovery["changed_types"]) or "无"
+            report = "\n".join(
+                [
+                    "# BTD6 活动发现",
+                    f"# JSON: {discovery_path}",
+                    "",
+                    f"变化类型: {changed}",
+                    f"部分结果: {'是' if discovery['partial'] else '否'}",
+                ]
+            )
 
     except KeyboardInterrupt:
         print("操作已停止", file=sys.stderr)

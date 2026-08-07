@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import time
+from dataclasses import replace
 from datetime import datetime
 from io import BytesIO
 from pathlib import Path
@@ -43,10 +45,48 @@ from btd6_core.common import sanitize_id, tr, tr_level_label, tr_reward_item
 
 
 ACTIVITY_TYPES = {"race", "boss", "odyssey", "daily"}
-EVENT_SCOPES = {"current", "upcoming", "latest"}
+LIFECYCLE_STATES = {"upcoming", "current", "ended"}
+EVENT_SCOPES = {*LIFECYCLE_STATES, "relevant", "latest"}
 ODYSSEY_DIFFICULTIES = {"easy", "medium", "hard"}
-SNAPSHOT_SCHEMA_VERSION = 1
+SNAPSHOT_SCHEMA_VERSION = 2
 ASSET_MAX_BYTES = 10 * 1024 * 1024
+NEGATIVE_CACHE_TTL_SECONDS = 120
+STALE_MAX_AGE_SECONDS = 6 * 60 * 60
+
+
+class ActivityAvailabilityError(RuntimeError):
+    def __init__(
+        self,
+        message: str,
+        *,
+        activity_type: str,
+        event_scope: str,
+        availability: str,
+        source_checked_at: str = "",
+        stale_reason: str = "",
+    ) -> None:
+        super().__init__(message)
+        self.activity_type = activity_type
+        self.event_scope = event_scope
+        self.availability = availability
+        self.source_checked_at = source_checked_at
+        self.stale_reason = stale_reason
+
+    def to_dict(self) -> dict[str, str]:
+        return {
+            "availability": self.availability,
+            "source_checked_at": self.source_checked_at,
+            "stale_reason": self.stale_reason,
+            "error": str(self),
+        }
+
+
+class ActivityNotPublishedError(ActivityAvailabilityError):
+    pass
+
+
+class ActivityUpstreamError(ActivityAvailabilityError):
+    pass
 
 TOWER_CATEGORIES: dict[str, str] = {
     "DartMonkey": "primary",
@@ -199,9 +239,40 @@ class ActivityRepository:
             raise ValueError("difficulty 仅支持 easy、medium、hard")
 
         events = self._fetch_events(normalized_type)
+        return self.fetch_snapshot_from_events(
+            normalized_type,
+            events,
+            difficulty=normalized_difficulty,
+            event_scope=normalized_scope,
+        )
+
+    def fetch_snapshot_from_events(
+        self,
+        activity_type: str,
+        events: list[dict[str, Any]],
+        *,
+        difficulty: str = "hard",
+        event_scope: str = "latest",
+    ) -> ActivitySnapshot:
+        normalized_type = str(activity_type or "").strip().lower()
+        normalized_scope = str(event_scope or "latest").strip().lower()
+        normalized_difficulty = str(difficulty or "hard").strip().lower()
+        if normalized_type not in ACTIVITY_TYPES:
+            raise ValueError(f"不支持的活动类型: {activity_type}")
+        if normalized_scope not in EVENT_SCOPES:
+            raise ValueError(f"event_scope 仅支持: {', '.join(sorted(EVENT_SCOPES))}")
+        if normalized_difficulty not in ODYSSEY_DIFFICULTIES:
+            raise ValueError("difficulty 仅支持 easy、medium、hard")
+
         candidates = _event_candidates(events, normalized_scope, now_ms=self.now_ms)
         if not candidates:
-            raise RuntimeError(f"{normalized_type} 没有符合 {normalized_scope} 范围的活动")
+            raise ActivityNotPublishedError(
+                f"{normalized_type} 没有符合 {normalized_scope} 范围的活动",
+                activity_type=normalized_type,
+                event_scope=normalized_scope,
+                availability="not_published",
+                source_checked_at=_now_iso(),
+            )
 
         errors: list[str] = []
         for event in candidates:
@@ -387,6 +458,7 @@ class ActivityRepository:
         status_start_at = start_at
         if activity_type == "daily":
             status_start_at = _int(normalized_attributes.get("created_at"))
+        checked_at = _now_iso()
         return ActivitySnapshot(
             schema_version=SNAPSHOT_SCHEMA_VERSION,
             activity_type=activity_type,
@@ -395,15 +467,18 @@ class ActivityRepository:
             description=_text(event.get("description")),
             start_at=start_at,
             end_at=end_at,
-            status=event_status(status_start_at, end_at, now_ms=self.now_ms),
+            status=classify_event(status_start_at, end_at, now_ms=self.now_ms),
             event_scope=event_scope,
-            fetched_at=_now_iso(),
+            fetched_at=checked_at,
             score_counts=score_counts,
             source_urls={key: value for key, value in source_urls.items() if value},
             attributes=normalized_attributes,
             challenges=challenges,
             odyssey=odyssey,
             unknown_fields=_unknown_fields(event, known_event_fields),
+            availability="fresh",
+            source_checked_at=checked_at,
+            provenance={"provider": "Ninja Kiwi Open Data API", "kind": "primary"},
         )
 
     def _fetch_challenge(self, url: str, *, label: str) -> ChallengeConfig | None:
@@ -674,12 +749,44 @@ def _event_candidates(
             return sorted(announced, key=lambda item: _int(item.get("createdAt")) or 10**30)
         return []
 
+    if scope == "ended":
+        matches = [
+            item
+            for item in timed
+            if classify_event(
+                _int(item.get("start")),
+                _int(item.get("end")),
+                now_ms=current_ms,
+            )
+            == "ended"
+        ]
+        return sorted(
+            matches,
+            key=lambda item: (
+                _int(item.get("end")) or -1,
+                _int(item.get("start")) or -1,
+            ),
+            reverse=True,
+        )
+
+    if scope == "relevant":
+        for lifecycle_scope in ("current", "upcoming", "ended"):
+            matches = _event_candidates(events, lifecycle_scope, now_ms=current_ms)
+            if matches:
+                return matches
+        return []
+
     if timed:
         return sorted(timed, key=lambda item: _int(item.get("start")) or -1, reverse=True)
     return sorted(events, key=lambda item: _int(item.get("createdAt")) or -1, reverse=True)
 
 
-def event_status(start_at: int | None, end_at: int | None, *, now_ms: int | None = None) -> str:
+def classify_event(
+    start_at: int | None,
+    end_at: int | None,
+    *,
+    now_ms: int | None = None,
+) -> str:
     current_ms = now_ms if now_ms is not None else int(time.time() * 1000)
     if start_at is not None and current_ms < start_at:
         return "upcoming"
@@ -688,6 +795,43 @@ def event_status(start_at: int | None, end_at: int | None, *, now_ms: int | None
     if start_at is not None and (end_at is None or current_ms <= end_at):
         return "current"
     return "unknown"
+
+
+# Backward-compatible name for callers outside the processor package.
+event_status = classify_event
+
+
+def refresh_snapshot_status(
+    snapshot: ActivitySnapshot,
+    *,
+    now_ms: int | None = None,
+) -> ActivitySnapshot:
+    start_at = snapshot.start_at
+    if snapshot.activity_type == "daily":
+        start_at = _int(snapshot.attributes.get("created_at"))
+    status = classify_event(start_at, snapshot.end_at, now_ms=now_ms)
+    return snapshot if status == snapshot.status else replace(snapshot, status=status)
+
+
+def activity_cache_ttl_seconds(
+    snapshot: ActivitySnapshot,
+    *,
+    now_ms: int | None = None,
+    regular_ttl_seconds: int = 600,
+) -> int:
+    current_ms = now_ms if now_ms is not None else int(time.time() * 1000)
+    start_at = snapshot.start_at
+    if snapshot.activity_type == "daily":
+        start_at = _int(snapshot.attributes.get("created_at"))
+    boundaries = [
+        boundary
+        for boundary in (start_at, (snapshot.end_at + 1) if snapshot.end_at is not None else None)
+        if boundary is not None and boundary > current_ms
+    ]
+    if not boundaries:
+        return max(1, int(regular_ttl_seconds))
+    until_boundary = max(1, math.ceil((min(boundaries) - current_ms) / 1000))
+    return max(1, min(int(regular_ttl_seconds), until_boundary))
 
 
 def resolve_activity_snapshot(
@@ -702,27 +846,60 @@ def resolve_activity_snapshot(
     normalized_type = str(activity_type or "").strip().lower()
     normalized_difficulty = str(difficulty or "hard").strip().lower()
     normalized_scope = str(event_scope or "latest").strip().lower()
+    if normalized_type not in ACTIVITY_TYPES:
+        raise ValueError(f"不支持的活动类型: {activity_type}")
+    if normalized_scope not in EVENT_SCOPES:
+        raise ValueError(f"event_scope 仅支持: {', '.join(sorted(EVENT_SCOPES))}")
     variant = normalized_difficulty if normalized_type == "odyssey" else "default"
     key = f"activity-snapshot:{normalized_type}:{variant}:{normalized_scope}"
     index_data = load_index()
     if not refresh:
         cached_path, cached_content = get_cached_content(index_data, key)
+        cached_availability = _load_availability(cached_content)
+        if cached_path and cached_availability is not None:
+            raise _availability_error_from_record(
+                normalized_type,
+                normalized_scope,
+                cached_availability,
+            )
         cached_snapshot = _load_snapshot(cached_content)
         if cached_path and cached_snapshot is not None:
-            desired_path = _snapshot_output_path(
-                cached_snapshot,
-                normalized_type,
-                variant,
-                normalized_scope,
-            )
-            if cached_path != desired_path:
-                save_cached_file(desired_path, cached_content or "")
-                index_put(index_data, key, cached_snapshot.event_id, desired_path)
-                save_index(index_data)
-                cached_path = desired_path
-            return cached_path, cached_snapshot, True
-    stale_path, stale_content = get_cached_content(index_data, key, allow_stale=True)
+            refreshed_snapshot = refresh_snapshot_status(cached_snapshot)
+            status_changed = refreshed_snapshot.status != cached_snapshot.status
+            cached_snapshot = refreshed_snapshot
+            if not _snapshot_matches_scope(cached_snapshot, normalized_scope):
+                cached_path = None
+            else:
+                refreshed_content = json.dumps(
+                    cached_snapshot.to_dict(), ensure_ascii=False, indent=2
+                )
+                desired_path = _snapshot_output_path(
+                    cached_snapshot,
+                    normalized_type,
+                    variant,
+                    normalized_scope,
+                )
+                if cached_path != desired_path or status_changed:
+                    save_cached_file(desired_path, refreshed_content)
+                    index_put(
+                        index_data,
+                        key,
+                        cached_snapshot.event_id,
+                        desired_path,
+                        ttl_seconds=activity_cache_ttl_seconds(cached_snapshot),
+                    )
+                    save_index(index_data)
+                    cached_path = desired_path
+                return cached_path, cached_snapshot, not status_changed
+    stale_path, stale_content = get_cached_content(
+        index_data,
+        key,
+        allow_stale=True,
+        max_stale_age_seconds=STALE_MAX_AGE_SECONDS,
+    )
     stale_snapshot = _load_snapshot(stale_content)
+    if stale_snapshot is not None:
+        stale_snapshot = refresh_snapshot_status(stale_snapshot)
 
     try:
         snapshot = ActivityRepository(client, translations).fetch_snapshot(
@@ -730,21 +907,67 @@ def resolve_activity_snapshot(
             difficulty=normalized_difficulty,
             event_scope=normalized_scope,
         )
-        file_path = _snapshot_output_path(
+        file_path = cache_activity_snapshot(
             snapshot,
+            difficulty=normalized_difficulty,
+            event_scope=normalized_scope,
+            index_data=index_data,
+            save=False,
+        )
+        save_index(index_data)
+        return file_path, snapshot, False
+    except ActivityNotPublishedError as exc:
+        record = exc.to_dict()
+        record.update(
+            {
+                "schema_version": 1,
+                "activity_type": normalized_type,
+                "event_scope": normalized_scope,
+            }
+        )
+        negative_path = _availability_output_path(
             normalized_type,
             variant,
             normalized_scope,
         )
-        content = json.dumps(snapshot.to_dict(), ensure_ascii=False, indent=2)
-        save_cached_file(file_path, content)
-        index_put(index_data, key, snapshot.event_id, file_path)
+        save_cached_file(
+            negative_path,
+            json.dumps(record, ensure_ascii=False, indent=2),
+        )
+        index_put(
+            index_data,
+            key,
+            "not_published",
+            negative_path,
+            ttl_seconds=NEGATIVE_CACHE_TTL_SECONDS,
+        )
         save_index(index_data)
-        return file_path, snapshot, False
+        raise
     except Exception as exc:  # noqa: BLE001
-        if stale_path and stale_snapshot is not None:
-            return stale_path, stale_snapshot, True
-        raise RuntimeError(f"{normalized_type} 活动快照刷新失败且无可用缓存: {exc}") from exc
+        reason = f"{type(exc).__name__}: {exc}"[:320]
+        if (
+            stale_path
+            and stale_snapshot is not None
+            and _snapshot_matches_scope(stale_snapshot, normalized_scope)
+        ):
+            return (
+                stale_path,
+                replace(
+                    stale_snapshot,
+                    availability="stale",
+                    source_checked_at=_now_iso(),
+                    stale_reason=reason,
+                ),
+                True,
+            )
+        raise ActivityUpstreamError(
+            f"{normalized_type} 活动快照刷新失败且无可用缓存: {exc}",
+            activity_type=normalized_type,
+            event_scope=normalized_scope,
+            availability="upstream_error",
+            source_checked_at=_now_iso(),
+            stale_reason=reason,
+        ) from exc
 
 
 def _load_snapshot(content: str | None) -> ActivitySnapshot | None:
@@ -757,6 +980,94 @@ def _load_snapshot(content: str | None) -> ActivitySnapshot | None:
         return None
 
 
+def cache_activity_snapshot(
+    snapshot: ActivitySnapshot,
+    *,
+    difficulty: str = "hard",
+    event_scope: str | None = None,
+    index_data: dict[str, Any] | None = None,
+    save: bool = True,
+) -> Path:
+    normalized_type = snapshot.activity_type
+    normalized_scope = str(event_scope or snapshot.event_scope).strip().lower()
+    variant = difficulty if normalized_type == "odyssey" else "default"
+    file_path = _snapshot_output_path(
+        snapshot,
+        normalized_type,
+        variant,
+        normalized_scope,
+    )
+    save_cached_file(
+        file_path,
+        json.dumps(snapshot.to_dict(), ensure_ascii=False, indent=2),
+    )
+    target_index = index_data if index_data is not None else load_index()
+    ttl_seconds = activity_cache_ttl_seconds(snapshot)
+    scope_key = f"activity-snapshot:{normalized_type}:{variant}:{normalized_scope}"
+    index_put(
+        target_index,
+        scope_key,
+        snapshot.event_id,
+        file_path,
+        ttl_seconds=ttl_seconds,
+    )
+    detail_key = f"activity-detail:{normalized_type}:{variant}:{snapshot.event_id}"
+    index_put(
+        target_index,
+        detail_key,
+        snapshot.event_id,
+        file_path,
+        ttl_seconds=ttl_seconds,
+    )
+    if save:
+        save_index(target_index)
+    return file_path
+
+
+def _load_availability(content: str | None) -> dict[str, Any] | None:
+    if not content:
+        return None
+    try:
+        value = json.loads(content)
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(value, dict) or value.get("availability") not in {
+        "not_published",
+        "upstream_error",
+    }:
+        return None
+    return value
+
+
+def _availability_error_from_record(
+    activity_type: str,
+    event_scope: str,
+    record: dict[str, Any],
+) -> ActivityAvailabilityError:
+    availability = str(record.get("availability", "upstream_error"))
+    error_type = (
+        ActivityNotPublishedError
+        if availability == "not_published"
+        else ActivityUpstreamError
+    )
+    return error_type(
+        str(record.get("error", "活动数据暂不可用")),
+        activity_type=activity_type,
+        event_scope=event_scope,
+        availability=availability,
+        source_checked_at=str(record.get("source_checked_at", "")),
+        stale_reason=str(record.get("stale_reason", "")),
+    )
+
+
+def _snapshot_matches_scope(snapshot: ActivitySnapshot, event_scope: str) -> bool:
+    if event_scope in LIFECYCLE_STATES:
+        return snapshot.status == event_scope
+    if event_scope == "relevant":
+        return snapshot.status in LIFECYCLE_STATES
+    return True
+
+
 def _snapshot_output_path(
     snapshot: ActivitySnapshot,
     activity_type: str,
@@ -764,6 +1075,15 @@ def _snapshot_output_path(
     event_scope: str,
 ) -> Path:
     filename = f"{sanitize_id(snapshot.event_id)}_{variant}_{event_scope}.json"
+    return OUTPUT_DIR / "snapshots" / activity_type / filename
+
+
+def _availability_output_path(
+    activity_type: str,
+    variant: str,
+    event_scope: str,
+) -> Path:
+    filename = f"availability_{variant}_{event_scope}.json"
     return OUTPUT_DIR / "snapshots" / activity_type / filename
 
 

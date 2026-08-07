@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import re
-import time
 from collections import defaultdict
 from collections.abc import Callable, Iterable
 from pathlib import Path
@@ -22,6 +21,7 @@ from btd6_core.activity_models import (
     PowerRule,
     TowerRule,
 )
+from btd6_core.activity_repository import classify_event
 from btd6_core.cache_store import PROJECT_ROOT
 from btd6_core.image_renderer import _load_font
 
@@ -30,7 +30,7 @@ MAX_HEIGHT = 16000
 MARGIN = 46
 CONTENT_WIDTH = WIDTH - MARGIN * 2
 ACTIVITY_BRIEF_RENDER_VERSION = "v3"
-ACTIVITY_OVERVIEW_RENDER_VERSION = "v2"
+ACTIVITY_OVERVIEW_RENDER_VERSION = "v3"
 ACTIVITY_ASSET_DIR = PROJECT_ROOT / "assets" / "activity_brief"
 HEADER_BANNER_PATHS = {
     "race": ACTIVITY_ASSET_DIR / "race_banner.png",
@@ -802,7 +802,12 @@ def _draw_overview_card(
             font=font(31),
             fill=COLORS["text"],
         )
-        message = "数据接口或缓存暂时不可用，请稍后再看。" if error else "当前范围没有可用活动。"
+        if error == "not_published":
+            message = "Ninja Kiwi Open Data 官方暂未发布该期活动。"
+        elif error:
+            message = "数据接口或缓存暂时不可用，请稍后再看。"
+        else:
+            message = "当前范围没有可用活动。"
         _draw_text_top(
             draw,
             (content_x, top + 125),
@@ -858,14 +863,15 @@ def _overview_status_label(status: str) -> str:
 def _overview_snapshot_status(snapshot: ActivitySnapshot | None) -> str:
     if snapshot is None:
         return "missing"
-    now_ms = int(time.time() * 1000)
-    if snapshot.start_at is not None and now_ms < snapshot.start_at:
-        return "upcoming"
-    if snapshot.end_at is not None and now_ms > snapshot.end_at:
-        return "ended"
-    if snapshot.start_at is not None:
-        return "current"
-    return snapshot.status
+    status_start_at = snapshot.start_at
+    if snapshot.activity_type == "daily":
+        created_at = snapshot.attributes.get("created_at")
+        status_start_at = (
+            created_at
+            if isinstance(created_at, int) and not isinstance(created_at, bool)
+            else None
+        )
+    return classify_event(status_start_at, snapshot.end_at)
 
 
 def _overview_time_text(snapshot: ActivitySnapshot) -> str:

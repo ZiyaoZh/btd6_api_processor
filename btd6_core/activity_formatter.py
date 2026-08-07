@@ -35,7 +35,12 @@ def format_activity_snapshot(snapshot: ActivitySnapshot) -> str:
         f"- 名称: {snapshot.name}",
         f"- ID: {snapshot.event_id}",
         f"- 状态: {_status_label(snapshot.status)}",
+        f"- 数据可用性: {_availability_label(snapshot.availability)}",
     ]
+    if snapshot.source_checked_at:
+        lines.append(f"- 来源检查时间: {snapshot.source_checked_at}")
+    if snapshot.stale_reason:
+        lines.append(f"- 陈旧缓存原因: {snapshot.stale_reason}")
     if snapshot.start_at is not None or snapshot.end_at is not None:
         lines.append(
             f"- 时间 (UTC{activity_timezone_label()}): "
@@ -251,6 +256,15 @@ def _challenge_label(value: str) -> str:
 
 def _status_label(value: str) -> str:
     return {"current": "进行中", "upcoming": "即将开始", "ended": "已结束"}.get(value, "未知")
+
+
+def _availability_label(value: str) -> str:
+    return {
+        "fresh": "最新数据",
+        "stale": "陈旧缓存",
+        "not_published": "官方暂未发布",
+        "upstream_error": "上游错误",
+    }.get(value, "未知")
 
 
 def _scoring_label(value: object) -> str:

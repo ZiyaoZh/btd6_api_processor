@@ -9,12 +9,14 @@ import time
 from dataclasses import dataclass
 from typing import Any
 from urllib import error, request
+from urllib.parse import urljoin, urlparse
 
 API_BASE = "https://data.ninjakiwi.com"
 RACES_URL = "/btd6/races"
 BOSSES_URL = "/btd6/bosses"
 ODYSSEY_URL = "/btd6/odyssey"
 DAILY_URL = "/btd6/challenges/filter/daily"
+MAX_LIST_PAGES = 10
 
 
 @dataclass
@@ -67,20 +69,71 @@ class ApiClient:
         raise RuntimeError(f"请求失败: {url}; 错误: {formatted_error}")
 
 
+def fetch_paginated(
+    client: ApiClient,
+    path_or_url: str,
+    *,
+    max_pages: int = MAX_LIST_PAGES,
+) -> list[dict[str, Any]]:
+    page_url = _pagination_url(path_or_url)
+    seen_pages: set[str] = set()
+    seen_event_ids: set[str] = set()
+    events: list[dict[str, Any]] = []
+
+    for _page_number in range(max(1, int(max_pages))):
+        normalized_url = urljoin(f"{API_BASE}/", page_url)
+        if normalized_url in seen_pages:
+            raise RuntimeError(f"分页链接形成循环: {normalized_url}")
+        seen_pages.add(normalized_url)
+
+        payload = client.get(page_url)
+        body = payload.get("body")
+        if not isinstance(body, list):
+            raise RuntimeError(f"活动列表端点未返回数组: {page_url}")
+        for item in body:
+            if not isinstance(item, dict):
+                continue
+            event_id = str(item.get("id", "") or "").strip()
+            if event_id and event_id in seen_event_ids:
+                continue
+            if event_id:
+                seen_event_ids.add(event_id)
+            events.append(item)
+
+        next_url = payload.get("next")
+        if not next_url:
+            return events
+        page_url = _pagination_url(str(next_url))
+
+    raise RuntimeError(f"活动列表分页超过安全上限 {max(1, int(max_pages))} 页")
+
+
+def _pagination_url(path_or_url: str) -> str:
+    raw = str(path_or_url or "").strip()
+    if not raw:
+        raise RuntimeError("分页链接为空")
+    absolute = urljoin(f"{API_BASE}/", raw)
+    parsed = urlparse(absolute)
+    api_host = urlparse(API_BASE).hostname
+    if parsed.scheme != "https" or parsed.hostname != api_host:
+        raise RuntimeError(f"拒绝非 Ninja Kiwi 域名的分页链接: {raw}")
+    return raw if raw.startswith("/") else absolute
+
+
 def fetch_races(client: ApiClient) -> list[dict[str, Any]]:
-    return client.get(RACES_URL).get("body", [])
+    return fetch_paginated(client, RACES_URL)
 
 
 def fetch_bosses(client: ApiClient) -> list[dict[str, Any]]:
-    return client.get(BOSSES_URL).get("body", [])
+    return fetch_paginated(client, BOSSES_URL)
 
 
 def fetch_odyssey(client: ApiClient) -> list[dict[str, Any]]:
-    return client.get(ODYSSEY_URL).get("body", [])
+    return fetch_paginated(client, ODYSSEY_URL)
 
 
 def fetch_daily_challenges(client: ApiClient) -> list[dict[str, Any]]:
-    return client.get(DAILY_URL).get("body", [])
+    return fetch_paginated(client, DAILY_URL)
 
 
 def fetch_raw_data(client: ApiClient) -> dict[str, Any]:

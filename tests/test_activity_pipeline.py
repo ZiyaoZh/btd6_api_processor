@@ -11,10 +11,12 @@ from unittest.mock import patch
 
 from PIL import Image, ImageDraw, ImageStat
 
+from api_raw_fetcher import fetch_paginated
 from btd6_core.activity_brief_service import (
     resolve_activity_brief,
     resolve_activity_overview,
 )
+from btd6_core.activity_discovery_service import discover_activities
 from btd6_core.activity_formatter import (
     challenge_limit_label,
     format_activity_snapshot,
@@ -28,11 +30,16 @@ from btd6_core.activity_renderer import (
     render_activity_overview,
 )
 from btd6_core.activity_repository import (
+    ActivityNotPublishedError,
     ActivityRepository,
     MapAssetCache,
+    activity_cache_ttl_seconds,
+    classify_event,
+    refresh_snapshot_status,
     resolve_activity_snapshot,
     select_event,
 )
+from btd6_core.cache_store import get_cached_content
 from btd6_core.common import parse_translation_tables
 from btd6_core.image_renderer import _load_font
 
@@ -134,7 +141,7 @@ class ActivityPipelineTests(unittest.TestCase):
         self.assertIn("UnidentifiedImageError", asset.error)
         self.assertEqual(asset.source_url, "https://example.test/map.png")
 
-    def test_event_selector_distinguishes_current_upcoming_and_latest(self) -> None:
+    def test_event_selector_distinguishes_lifecycle_and_relevant_scopes(self) -> None:
         events = [
             {"id": "ended", "start": 100, "end": 200},
             {"id": "current", "start": 300, "end": 500},
@@ -144,8 +151,12 @@ class ActivityPipelineTests(unittest.TestCase):
 
         self.assertEqual(select_event(events, "current", now_ms=400)["id"], "current")  # type: ignore[index]
         self.assertEqual(select_event(events, "upcoming", now_ms=400)["id"], "next")  # type: ignore[index]
+        self.assertEqual(select_event(events, "ended", now_ms=400)["id"], "ended")  # type: ignore[index]
+        self.assertEqual(select_event(events, "relevant", now_ms=400)["id"], "current")  # type: ignore[index]
         self.assertEqual(select_event(events, "latest", now_ms=400)["id"], "latest")  # type: ignore[index]
         self.assertIsNone(select_event(events, "current", now_ms=1000))
+        self.assertEqual(select_event(events, "relevant", now_ms=550)["id"], "next")  # type: ignore[index]
+        self.assertEqual(select_event(events, "relevant", now_ms=1000)["id"], "latest")  # type: ignore[index]
 
         daily_events = [
             {"id": "published", "createdAt": 300},
@@ -153,6 +164,41 @@ class ActivityPipelineTests(unittest.TestCase):
         ]
         self.assertEqual(select_event(daily_events, "current", now_ms=400)["id"], "published")  # type: ignore[index]
         self.assertEqual(select_event(daily_events, "upcoming", now_ms=400)["id"], "announced")  # type: ignore[index]
+        self.assertEqual(select_event(daily_events, "relevant", now_ms=400)["id"], "published")  # type: ignore[index]
+
+    def test_lifecycle_boundaries_and_cache_ttl_do_not_cross_transition(self) -> None:
+        self.assertEqual(classify_event(100, 200, now_ms=99), "upcoming")
+        self.assertEqual(classify_event(100, 200, now_ms=100), "current")
+        self.assertEqual(classify_event(100, 200, now_ms=200), "current")
+        self.assertEqual(classify_event(100, 200, now_ms=201), "ended")
+
+        fixture = _fixture("race_end_of_line.json")
+        event = fixture["list_response"]["body"][0]
+        snapshot = ActivityRepository(
+            _race_client(),  # type: ignore[arg-type]
+            TRANSLATIONS,
+            asset_fetcher=StaticAssetFetcher(),
+            now_ms=event["start"] - 1500,
+        ).fetch_snapshot("race", event_scope="upcoming")
+        self.assertEqual(
+            activity_cache_ttl_seconds(snapshot, now_ms=event["start"] - 1500),
+            2,
+        )
+
+    def test_refresh_snapshot_status_reclassifies_old_snapshot(self) -> None:
+        fixture = _fixture("race_end_of_line.json")
+        event = fixture["list_response"]["body"][0]
+        snapshot = ActivityRepository(
+            _race_client(),  # type: ignore[arg-type]
+            TRANSLATIONS,
+            asset_fetcher=StaticAssetFetcher(),
+            now_ms=event["start"] + 1,
+        ).fetch_snapshot("race", event_scope="current")
+
+        refreshed = refresh_snapshot_status(snapshot, now_ms=event["end"] + 1)
+
+        self.assertEqual(snapshot.status, "current")
+        self.assertEqual(refreshed.status, "ended")
 
     def test_race_fixture_preserves_map_bans_categories_and_unknown_fields(self) -> None:
         fixture = _fixture("race_end_of_line.json")
@@ -292,7 +338,7 @@ class ActivityPipelineTests(unittest.TestCase):
         self.assertEqual(snapshot.attributes["created_at"], 100)
         self.assertEqual(client.calls[-2:], ["https://example.test/broken", "https://example.test/valid"])
 
-    def test_snapshot_cache_uses_stale_json_when_refresh_fails(self) -> None:
+    def test_snapshot_cache_uses_bounded_stale_json_when_refresh_fails(self) -> None:
         fixture = _fixture("race_end_of_line.json")
         event = fixture["list_response"]["body"][0]
         snapshot = ActivityRepository(
@@ -317,13 +363,232 @@ class ActivityPipelineTests(unittest.TestCase):
                     FailingClient(),  # type: ignore[arg-type]
                     TRANSLATIONS,
                     "race",
-                    event_scope="current",
+                    event_scope="relevant",
                 )
 
         self.assertTrue(cached)
         self.assertEqual(path, stale_path)
         self.assertEqual(restored.event_id, snapshot.event_id)
+        self.assertEqual(restored.status, "ended")
+        self.assertEqual(restored.availability, "stale")
+        self.assertIn("offline", restored.stale_reason)
         self.assertEqual(restored.challenges[0].tower_rules, snapshot.challenges[0].tower_rules)
+
+    def test_successful_empty_scope_never_falls_back_to_stale_activity(self) -> None:
+        fixture = _fixture("race_end_of_line.json")
+        event = fixture["list_response"]["body"][0]
+        snapshot = ActivityRepository(
+            _race_client(),  # type: ignore[arg-type]
+            TRANSLATIONS,
+            asset_fetcher=StaticAssetFetcher(),
+            now_ms=event["start"] + 1,
+        ).fetch_snapshot("race", event_scope="current")
+        content = json.dumps(snapshot.to_dict(), ensure_ascii=False)
+        empty_client = FixtureClient(
+            {"/btd6/races": {"success": True, "body": [], "next": None}}
+        )
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            stale_path = Path(temp_dir) / "stale.json"
+            stale_path.write_text(content, encoding="utf-8")
+            with (
+                patch("btd6_core.activity_repository.OUTPUT_DIR", Path(temp_dir)),
+                patch("btd6_core.activity_repository.load_index", return_value={"items": {}}),
+                patch(
+                    "btd6_core.activity_repository.get_cached_content",
+                    side_effect=[(None, None), (stale_path, content)],
+                ),
+                patch("btd6_core.activity_repository.save_index"),
+            ):
+                with self.assertRaises(ActivityNotPublishedError) as raised:
+                    resolve_activity_snapshot(
+                        empty_client,  # type: ignore[arg-type]
+                        TRANSLATIONS,
+                        "race",
+                        event_scope="current",
+                    )
+
+        self.assertEqual(raised.exception.availability, "not_published")
+        self.assertEqual(empty_client.calls, ["/btd6/races"])
+
+    def test_upcoming_metadata_failure_can_use_matching_stale_snapshot(self) -> None:
+        fixture = _fixture("race_end_of_line.json")
+        original_event = fixture["list_response"]["body"][0]
+        base_snapshot = ActivityRepository(
+            _race_client(),  # type: ignore[arg-type]
+            TRANSLATIONS,
+            asset_fetcher=StaticAssetFetcher(),
+            now_ms=original_event["start"] + 1,
+        ).fetch_snapshot("race", event_scope="current")
+        stale_snapshot = replace(
+            base_snapshot,
+            event_id="future",
+            start_at=1_100_000,
+            end_at=1_200_000,
+            status="upcoming",
+            event_scope="upcoming",
+        )
+        content = json.dumps(stale_snapshot.to_dict(), ensure_ascii=False)
+        future_event = {
+            "id": "future",
+            "name": "Future",
+            "start": 1_100_000,
+            "end": 1_200_000,
+            "metadata": "https://example.test/not-ready",
+        }
+        client = FixtureClient(
+            {
+                "/btd6/races": {
+                    "success": True,
+                    "body": [future_event],
+                    "next": None,
+                }
+            }
+        )
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            stale_path = Path(temp_dir) / "stale.json"
+            stale_path.write_text(content, encoding="utf-8")
+            with (
+                patch("btd6_core.activity_repository.time.time", return_value=1000),
+                patch("btd6_core.activity_repository.load_index", return_value={"items": {}}),
+                patch(
+                    "btd6_core.activity_repository.get_cached_content",
+                    side_effect=[(None, None), (stale_path, content)],
+                ),
+            ):
+                path, restored, cached = resolve_activity_snapshot(
+                    client,  # type: ignore[arg-type]
+                    TRANSLATIONS,
+                    "race",
+                    event_scope="upcoming",
+                )
+
+        self.assertTrue(cached)
+        self.assertEqual(path, stale_path)
+        self.assertEqual(restored.availability, "stale")
+        self.assertEqual(restored.status, "upcoming")
+        self.assertIn("not-ready", restored.stale_reason)
+
+    def test_stale_cache_max_age_is_enforced(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "cached.json"
+            path.write_text("{}", encoding="utf-8")
+            index = {
+                "items": {
+                    "key": {
+                        "path": str(path),
+                        "updatedAtEpoch": 100,
+                        "ttlSeconds": 10,
+                    }
+                }
+            }
+            with patch("btd6_core.cache_store.time.time", return_value=1000):
+                cached_path, _content = get_cached_content(
+                    index,
+                    "key",
+                    allow_stale=True,
+                    max_stale_age_seconds=100,
+                )
+        self.assertIsNone(cached_path)
+
+    def test_paginated_fetch_deduplicates_and_rejects_loops_or_external_hosts(self) -> None:
+        client = FixtureClient(
+            {
+                "/btd6/races": {
+                    "success": True,
+                    "body": [{"id": "one"}],
+                    "next": "/btd6/races?page=2",
+                },
+                "/btd6/races?page=2": {
+                    "success": True,
+                    "body": [{"id": "one"}, {"id": "two"}],
+                    "next": None,
+                },
+            }
+        )
+        self.assertEqual(
+            [item["id"] for item in fetch_paginated(client, "/btd6/races")],
+            ["one", "two"],
+        )
+
+        loop_client = FixtureClient(
+            {
+                "/btd6/races": {
+                    "success": True,
+                    "body": [],
+                    "next": "/btd6/races",
+                }
+            }
+        )
+        with self.assertRaisesRegex(RuntimeError, "循环"):
+            fetch_paginated(loop_client, "/btd6/races")
+
+        external_client = FixtureClient(
+            {
+                "/btd6/races": {
+                    "success": True,
+                    "body": [],
+                    "next": "https://example.test/stolen",
+                }
+            }
+        )
+        with self.assertRaisesRegex(RuntimeError, "非 Ninja Kiwi"):
+            fetch_paginated(external_client, "/btd6/races")
+
+    def test_discovery_only_invalidates_cache_when_timeline_changes(self) -> None:
+        responses = {
+            "/btd6/races": {"success": True, "body": [], "next": None},
+            "/btd6/bosses": {"success": True, "body": [], "next": None},
+            "/btd6/odyssey": {"success": True, "body": [], "next": None},
+            "/btd6/challenges/filter/daily": {
+                "success": True,
+                "body": [],
+                "next": None,
+            },
+        }
+        index = {
+            "items": {
+                "activity-snapshot:race:default:current": {},
+                "activity-detail:race:default:event": {},
+                "activity-overview:v2:hard:relevant": {},
+                "unrelated": {},
+            }
+        }
+        with tempfile.TemporaryDirectory() as temp_dir:
+            discovery_path = Path(temp_dir) / "discovery.json"
+            with (
+                patch(
+                    "btd6_core.activity_discovery_service.DISCOVERY_PATH",
+                    discovery_path,
+                ),
+                patch(
+                    "btd6_core.activity_discovery_service.load_index",
+                    return_value=index,
+                ),
+                patch("btd6_core.activity_discovery_service.save_index"),
+            ):
+                _path, first = discover_activities(
+                    FixtureClient(responses),  # type: ignore[arg-type]
+                    TRANSLATIONS,
+                    now_ms=400,
+                )
+                _path, second = discover_activities(
+                    FixtureClient(responses),  # type: ignore[arg-type]
+                    TRANSLATIONS,
+                    now_ms=400,
+                )
+
+        self.assertEqual(set(first["changed_types"]), {"race", "boss", "odyssey", "daily"})
+        self.assertEqual(second["changed_types"], [])
+        self.assertIn("activity-snapshot:race:default:current", index["items"])
+        self.assertIn(
+            "updatedAtEpoch",
+            index["items"]["activity-snapshot:race:default:current"],
+        )
+        self.assertNotIn("activity-overview:v2:hard:relevant", index["items"])
+        self.assertIn("activity-detail:race:default:event", index["items"])
+        self.assertIn("unrelated", index["items"])
 
     def test_renderers_create_deterministic_nonblank_dynamic_images(self) -> None:
         race_fixture = _fixture("race_end_of_line.json")
@@ -634,8 +899,10 @@ class ActivityPipelineTests(unittest.TestCase):
         self.assertFalse(cached)
         self.assertEqual(manifest["activity_type"], "all")
         self.assertEqual(len(manifest["activities"]), 3)
+        self.assertTrue(manifest["partial"])
+        self.assertEqual(manifest["availability"]["boss"]["state"], "upstream_error")
         self.assertIn("boss", manifest["errors"])
-        self.assertIn("Boss: 暂未取得活动数据", report)
+        self.assertIn("Boss: 上游数据暂不可用", report)
         self.assertEqual(image_size[0], 1080)
         self.assertGreater(image_size[1], 1200)
 

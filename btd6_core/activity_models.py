@@ -125,6 +125,10 @@ class ActivitySnapshot:
     challenges: tuple[ChallengeConfig, ...] = ()
     odyssey: OdysseyConfig | None = None
     unknown_fields: dict[str, Any] = field(default_factory=dict)
+    availability: str = "fresh"
+    source_checked_at: str = ""
+    stale_reason: str = ""
+    provenance: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -164,6 +168,12 @@ class ActivitySnapshot:
             challenges=challenges,
             odyssey=odyssey,
             unknown_fields=_as_dict(value.get("unknown_fields")),
+            availability=str(value.get("availability", "fresh")),
+            source_checked_at=str(
+                value.get("source_checked_at", value.get("fetched_at", ""))
+            ),
+            stale_reason=str(value.get("stale_reason", "")),
+            provenance=_as_dict(value.get("provenance")),
         )
 
 

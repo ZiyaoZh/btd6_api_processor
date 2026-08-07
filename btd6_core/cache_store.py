@@ -82,12 +82,20 @@ def get_cached_content(
     key: str,
     ttl_seconds: int = CACHE_TTL_SECONDS,
     allow_stale: bool = False,
+    max_stale_age_seconds: int | None = None,
 ) -> tuple[Path | None, str | None]:
     item = index_data.get("items", {}).get(key)
     if not isinstance(item, dict):
         return None, None
     if not allow_stale and not _is_cache_fresh(item, ttl_seconds=ttl_seconds):
         return None, None
+    if allow_stale and max_stale_age_seconds is not None:
+        updated_at_epoch = _item_updated_at_epoch(item)
+        if (
+            updated_at_epoch is None
+            or int(time.time()) - updated_at_epoch > max(0, max_stale_age_seconds)
+        ):
+            return None, None
     raw_path = item.get("path")
     if not raw_path:
         return None, None
@@ -102,12 +110,20 @@ def get_cached_path(
     key: str,
     ttl_seconds: int = CACHE_TTL_SECONDS,
     allow_stale: bool = False,
+    max_stale_age_seconds: int | None = None,
 ) -> Path | None:
     item = index_data.get("items", {}).get(key)
     if not isinstance(item, dict):
         return None
     if not allow_stale and not _is_cache_fresh(item, ttl_seconds=ttl_seconds):
         return None
+    if allow_stale and max_stale_age_seconds is not None:
+        updated_at_epoch = _item_updated_at_epoch(item)
+        if (
+            updated_at_epoch is None
+            or int(time.time()) - updated_at_epoch > max(0, max_stale_age_seconds)
+        ):
+            return None
     raw_path = item.get("path")
     if not raw_path:
         return None

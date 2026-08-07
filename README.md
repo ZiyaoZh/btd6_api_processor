@@ -107,8 +107,8 @@ python btd6_cli.py --help
 - `--api-key`：Ninja Kiwi API Key，可选。
 - `--translate`：翻译表路径，默认 `translate.md`。
 - `--output`：主输出文件路径，默认 `output/btd6_digest.md`。
-- `--mode`：模式，可选 `summary` / `detail` / `brief-image` / `leaderboard` / `collection-event` / `update`。
-- `--event-scope`：`current` / `upcoming` / `latest`；detail 默认 `latest`，brief-image 默认 `current`。
+- `--mode`：模式，可选 `summary` / `detail` / `brief-image` / `leaderboard` / `collection-event` / `discover` / `update`。
+- `--event-scope`：`current` / `upcoming` / `ended` / `relevant` / `latest`。前三者是严格生命周期状态；`relevant` 依次选择进行中、下一期、最近结束；`latest` 仅兼容旧调用。detail 默认 `latest`，all 总览默认 `relevant`，单项图默认 `current`。
 - `--difficulty`：征程难度 `easy` / `medium` / `hard`，默认 `hard`。
 - `--collection-event-output`：collection-event 模式的 JSON 输出路径，默认 `output/collection_event_schedule.json`。
 - `--collection-event-image-output`：collection-event 模式的图片输出路径，默认 `output/collection_event_schedule.png`。
