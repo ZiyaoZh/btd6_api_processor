@@ -38,6 +38,7 @@ TOWER_POOL = [
     "BeastHandler",
     "Mermonkey",
     "Desperado",
+    "Skywarden",
 ]
 
 ICON_NAME_OVERRIDES = {

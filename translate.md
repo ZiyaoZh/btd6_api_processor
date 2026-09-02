@@ -30,6 +30,7 @@
 | Geraldo | 杰拉尔多 |
 | Corvus | 科沃斯 |
 | Silas | 西拉斯 |
+| DanDMonke | 丹·迪猴 |
 | ChosenPrimaryHero | 自选英雄 |
 
 ---
@@ -58,6 +59,8 @@
 | Alchemist | 炼金术士 |
 | Druid | 德鲁伊 |
 | MerMonkey | 人鱼猴 |
+| Mermonkey | 人鱼猴 |
+| Skywarden | 天卫 |
 | BananaFarm | 香蕉农场 |
 | SpikeFactory | 刺钉工厂 |
 | MonkeyVillage | 猴村 |
@@ -71,16 +74,20 @@
 | 英文 | 中文 |
 |------|------|
 | MonkeyMeadow | 猴子草甸 |
+| Tutorial | 教程 |
 | InTheLoop | 循环 |
 | ThreeMilesRound | 三矿回合 |
 | ThreeMinesAround | 三矿环绕 |
 | MiddleOfTheRoad | 道路中间 |
 | TinkerTon | 汀克顿 |
+| Tinkerton | 汀克顿 |
 | SpaPits | 水疗温泉 |
 | TreeStump | 树桩 |
 | TownCenter | 市中心 |
+| TownCentre | 市中心 |
 | OneTwoTree | 一二杉 |
 | ScrapYard | 废料场 |
+| Scrapyard | 废料场 |
 | TheCabin | 小木屋 |
 | Resort | 度假胜地 |
 | Skates | 溜冰鞋 |
@@ -109,6 +116,7 @@
 | AdorasTemple | 阿多拉神庙 |
 | SpringSpring | 复活节春天 |
 | KartMonkey | 飞镖卡丁车 |
+| KartsNDarts | 飞镖卡丁车 |
 | MoonLanding | 登月 |
 | Haunted | 鬼屋 |
 | Downstream | 顺流而下 |
@@ -120,8 +128,12 @@
 | SpiceIslands | 香料群岛 |
 | LuminousCove | 夜光海湾 |
 | LostCrevasse | 失落冰隙 |
+| Ascent | 飞升 |
+| MushroomGrotto | 蘑菇洞穴 |
+| PartyParade | 派对游行 |
 | CastleRevenge | 城堡复仇 |
 | DarkPath | 黑暗之径 |
+| DarkDungeons | 黑暗地下城 |
 | Erosion | 侵蚀 |
 | MidnightMansion | 午夜豪宅 |
 | SunkenColumns | 凹陷的柱子 |
@@ -153,6 +165,7 @@
 | DarkCastle | 黑暗城堡 |
 | MuddyPuddles | 泥泞的水坑 |
 | Ouch | #哎哟 |
+| #ouch | #哎哟 |
 | TrickyTracks | 棘手的轨道 |
 | SkullTweak | 骷髅变奏 |
 ---
@@ -199,6 +212,7 @@
 | Phayze | 菲茨 |
 | Blastapopoulos | 轰炸飞艇 |
 | Diamondback | 菱背 |
+| Lych | 巫妖 |
 
 ---
 

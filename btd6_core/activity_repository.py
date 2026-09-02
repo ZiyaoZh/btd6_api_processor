@@ -110,6 +110,7 @@ TOWER_CATEGORIES: dict[str, str] = {
     "Druid": "magic",
     "Mermonkey": "magic",
     "MerMonkey": "magic",
+    "Skywarden": "magic",
     "BananaFarm": "support",
     "SpikeFactory": "support",
     "MonkeyVillage": "support",

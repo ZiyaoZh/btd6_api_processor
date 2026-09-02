@@ -41,6 +41,10 @@ from btd6_core.activity_repository import (
 )
 from btd6_core.cache_store import get_cached_content
 from btd6_core.common import parse_translation_tables
+from btd6_core.collection_event_service import (
+    TOWER_POOL as COLLECTION_TOWER_POOL,
+    _resolve_tower_icon_path,
+)
 from btd6_core.image_renderer import _load_font
 
 
@@ -310,6 +314,29 @@ class ActivityPipelineTests(unittest.TestCase):
             challenge_limit_label(unset_odyssey_map, "max_paragons"),
             "未设置",
         )
+
+    def test_content_version_56_towers_and_heroes_are_normalized(self) -> None:
+        repository = ActivityRepository(  # type: ignore[arg-type]
+            FixtureClient({}),
+            TRANSLATIONS,
+            asset_fetcher=StaticAssetFetcher(),
+        )
+        challenge = repository._normalize_challenge(  # noqa: SLF001
+            {
+                "_towers": [
+                    {"tower": "Skywarden", "max": -1, "isHero": False},
+                    {"tower": "DanDMonke", "max": 1, "isHero": True},
+                ]
+            },
+            label="standard",
+        )
+
+        skywarden, dan_d_monke = challenge.tower_rules
+        self.assertEqual((skywarden.name, skywarden.category), ("天卫", "magic"))
+        self.assertEqual((dan_d_monke.name, dan_d_monke.category), ("丹·迪猴", "hero"))
+        self.assertEqual(len(COLLECTION_TOWER_POOL), 26)
+        self.assertEqual(COLLECTION_TOWER_POOL[-2:], ["Desperado", "Skywarden"])
+        self.assertIsNotNone(_resolve_tower_icon_path("Skywarden"))
 
     def test_repository_skips_dangling_latest_daily_metadata(self) -> None:
         events = [
