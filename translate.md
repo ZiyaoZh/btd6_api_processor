@@ -128,6 +128,7 @@
 | SpiceIslands | 香料群岛 |
 | LuminousCove | 夜光海湾 |
 | LostCrevasse | 失落冰隙 |
+| ShipCapture | 夺船大战 |
 | Ascent | 飞升 |
 | MushroomGrotto | 蘑菇洞穴 |
 | PartyParade | 派对游行 |
