@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+import re
 import time
 from dataclasses import replace
 from datetime import datetime
@@ -835,6 +836,164 @@ def activity_cache_ttl_seconds(
     return max(1, min(int(regular_ttl_seconds), until_boundary))
 
 
+def archived_activity_snapshots(
+    activity_type: str, variant: str = "default",
+) -> dict[str, ActivitySnapshot]:
+    """Read retained snapshots independently of the expiring cache index."""
+    directory = OUTPUT_DIR / "snapshots" / activity_type
+    records: dict[str, ActivitySnapshot] = {}
+    for path in directory.glob(f"*_{variant}_*.json"):
+        try:
+            item = _load_snapshot(path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeError):
+            continue
+        if item is None or item.activity_type != activity_type or item.event_id in {"", "unknown"}:
+            continue
+        previous = records.get(item.event_id)
+        if previous is None or item.fetched_at > previous.fetched_at:
+            records[item.event_id] = item
+    return records
+
+
+def archived_event(snapshot: ActivitySnapshot) -> dict[str, Any]:
+    return {
+        "id": snapshot.event_id,
+        "name": snapshot.name,
+        "start": snapshot.start_at,
+        "end": snapshot.end_at,
+        "createdAt": snapshot.attributes.get("created_at"),
+        "leaderboard": snapshot.source_urls.get("leaderboard"),
+        "leaderboard_standard_players_1": snapshot.source_urls.get("leaderboard_standard"),
+        "leaderboard_elite_players_1": snapshot.source_urls.get("leaderboard_elite"),
+        "normalScoringType": snapshot.attributes.get("normal_scoring_type"),
+        "eliteScoringType": snapshot.attributes.get("elite_scoring_type"),
+        "totalScores": snapshot.score_counts.get("total"),
+        "totalScores_standard": snapshot.score_counts.get("standard"),
+        "totalScores_elite": snapshot.score_counts.get("elite"),
+    }
+
+
+def _resolve_historical_snapshot(
+    repository: ActivityRepository,
+    activity_type: str,
+    difficulty: str,
+    event_scope: str,
+    event_query: str,
+) -> tuple[Path, ActivitySnapshot, bool]:
+    variant = difficulty if activity_type == "odyssey" else "default"
+    archived = archived_activity_snapshots(activity_type, variant)
+    # An exact historical ID or name can be resolved even when the API is down.
+    query = event_query.casefold()
+    exact_archives = [
+        item for item in archived.values()
+        if query in {item.event_id.casefold(), item.name.casefold()}
+        and refresh_snapshot_status(item, now_ms=repository.now_ms).status == "ended"
+    ]
+    if len(exact_archives) == 1:
+        return _retained_activity_result(
+            exact_archives[0], repository.now_ms, variant, "latest", "按编号查询本地历史快照", True,
+        )
+
+    upstream_error = ""
+    try:
+        live = {
+            str(event["id"]): event
+            for event in repository._fetch_events(activity_type)
+            if event.get("id")
+        }
+    except RuntimeError as exc:
+        live = {}
+        upstream_error = str(exc)
+
+    events = {event_id: archived_event(item) for event_id, item in archived.items()}
+    events.update(live)
+    if event_query:
+        candidates = [
+            event for event in events.values()
+            if query in {str(event["id"]).casefold(), str(event.get("name", "")).casefold()}
+        ]
+        if query.isdecimal() and activity_type == "boss":
+            candidates = [
+                event for event in events.values()
+                if (number := re.search(r"([0-9]+)$", str(event.get("name", ""))))
+                and number[1].lstrip("0") == query.lstrip("0")
+            ]
+        exact_ids = [item for item in candidates if str(item["id"]).casefold() == query]
+        if exact_ids:
+            candidates = exact_ids
+        if len(candidates) > 1:
+            names = "、".join(f"{item['name']}（{item['id']}）" for item in candidates)
+            raise ValueError(f"找到多个匹配活动：{names}。请补充完整活动 ID。")
+        event = candidates[0] if candidates else None
+    else:
+        event = select_event(list(events.values()), event_scope, now_ms=repository.now_ms)
+
+    if event is None:
+        label = f"编号或名称为 {event_query}" if event_query else "已结束的"
+        if upstream_error:
+            raise ActivityUpstreamError(
+                f"本地没有{label}活动记录，且无法查询官方列表。",
+                activity_type=activity_type, event_scope=event_scope,
+                availability="upstream_error", stale_reason=upstream_error,
+            )
+        raise ActivityNotPublishedError(
+            f"官方列表和本地快照均未找到{label}活动。",
+            activity_type=activity_type, event_scope=event_scope, availability="not_published",
+        )
+
+    event_id = str(event["id"])
+    stored = archived.get(event_id)
+    scope = "latest" if event_query else event_scope
+    if event_query and stored is not None:
+        if refresh_snapshot_status(stored, now_ms=repository.now_ms).status == "ended":
+            return _retained_activity_result(
+                stored, repository.now_ms, variant, scope, "按编号查询本地历史快照", True,
+            )
+    reason = upstream_error or "官方活动列表已不包含这一期"
+    if event_id in live:
+        try:
+            snapshot = repository.fetch_snapshot_from_events(
+                activity_type, [event], difficulty=difficulty, event_scope=scope,
+            )
+        except RuntimeError as exc:
+            if stored is None:
+                raise
+            reason = str(exc)
+        else:
+            if not event_query:
+                path = cache_activity_snapshot(snapshot, difficulty=difficulty, event_scope=scope)
+                return path, snapshot, False
+            path = _snapshot_output_path(snapshot, activity_type, variant, "event")
+            save_cached_file(path, json.dumps(snapshot.to_dict(), ensure_ascii=False, indent=2))
+            return path, snapshot, False
+
+    assert stored is not None
+    return _retained_activity_result(
+        stored, repository.now_ms, variant, scope, reason, bool(event_query),
+    )
+
+
+def _retained_activity_result(
+    stored: ActivitySnapshot,
+    now_ms: int,
+    variant: str,
+    scope: str,
+    reason: str,
+    numbered: bool,
+) -> tuple[Path, ActivitySnapshot, bool]:
+    snapshot = replace(
+        refresh_snapshot_status(stored, now_ms=now_ms),
+        event_scope=scope,
+        availability="stale",
+        stale_reason=reason[:320],
+    )
+    suffix = "event" if numbered else "ended"
+    filename = f"{sanitize_id(stored.event_id)}_{variant}_{suffix}.json"
+    path = OUTPUT_DIR / "history_results" / stored.activity_type / filename
+    save_cached_file(path, json.dumps(snapshot.to_dict(), ensure_ascii=False, indent=2))
+    return path, snapshot, True
+
+
 def resolve_activity_snapshot(
     client: ApiClient,
     translations: dict[str, dict[str, str]],
@@ -843,6 +1002,7 @@ def resolve_activity_snapshot(
     difficulty: str = "hard",
     event_scope: str = "latest",
     refresh: bool = False,
+    event_query: str = "",
 ) -> tuple[Path, ActivitySnapshot, bool]:
     normalized_type = str(activity_type or "").strip().lower()
     normalized_difficulty = str(difficulty or "hard").strip().lower()
@@ -851,13 +1011,21 @@ def resolve_activity_snapshot(
         raise ValueError(f"不支持的活动类型: {activity_type}")
     if normalized_scope not in EVENT_SCOPES:
         raise ValueError(f"event_scope 仅支持: {', '.join(sorted(EVENT_SCOPES))}")
+    if normalized_difficulty not in ODYSSEY_DIFFICULTIES:
+        raise ValueError("difficulty 仅支持 easy、medium、hard")
+    query = event_query.strip()
     variant = normalized_difficulty if normalized_type == "odyssey" else "default"
     key = f"activity-snapshot:{normalized_type}:{variant}:{normalized_scope}"
     index_data = load_index()
+    if query:
+        return _resolve_historical_snapshot(
+            ActivityRepository(client, translations),
+            normalized_type, normalized_difficulty, normalized_scope, query,
+        )
     if not refresh:
         cached_path, cached_content = get_cached_content(index_data, key)
         cached_availability = _load_availability(cached_content)
-        if cached_path and cached_availability is not None:
+        if cached_path and cached_availability is not None and normalized_scope != "ended":
             raise _availability_error_from_record(
                 normalized_type,
                 normalized_scope,
@@ -892,6 +1060,11 @@ def resolve_activity_snapshot(
                     save_index(index_data)
                     cached_path = desired_path
                 return cached_path, cached_snapshot, not status_changed
+    if normalized_scope == "ended":
+        return _resolve_historical_snapshot(
+            ActivityRepository(client, translations),
+            normalized_type, normalized_difficulty, normalized_scope, "",
+        )
     stale_path, stale_content = get_cached_content(
         index_data,
         key,

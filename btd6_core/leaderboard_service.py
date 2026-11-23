@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Any
 
 from api_raw_fetcher import ApiClient, fetch_bosses, fetch_races
+from btd6_core.activity_repository import archived_activity_snapshots, archived_event, select_event
 from btd6_core.cache_store import (
     OUTPUT_DIR,
     get_cached_content,
@@ -108,7 +109,9 @@ def fetch_leaderboard_raw_data(client: ApiClient, leaderboard_type: str) -> dict
     raise ValueError(f"不支持的排行榜类型: {leaderboard_type}")
 
 
-def build_single_leaderboard_table_data(leaderboard_type: str, page: int, raw: dict[str, Any]) -> dict[str, Any]:
+def build_single_leaderboard_table_data(
+    leaderboard_type: str, page: int, raw: dict[str, Any], *, event_scope: str = "relevant",
+) -> dict[str, Any]:
     if page < 1:
         raise ValueError("page 必须 >= 1")
 
@@ -120,8 +123,13 @@ def build_single_leaderboard_table_data(leaderboard_type: str, page: int, raw: d
     folder = ""
     suffix = ""
 
+    events = raw.get("races" if leaderboard_type == "race" else "bosses", [])
+    event = select_event(events, "ended") if event_scope == "ended" else pick_current_or_latest(events)
+    if event_scope == "ended" and event is None:
+        raise RuntimeError("官方列表和本地快照均未找到已结束的活动。")
+
     if leaderboard_type == "race":
-        race = pick_current_or_latest(raw.get("races", []))
+        race = event
         if not race:
             raise RuntimeError("竞速数据为空")
         title = "竞速排行榜"
@@ -136,7 +144,7 @@ def build_single_leaderboard_table_data(leaderboard_type: str, page: int, raw: d
         is_boss = False
         total_submissions = race.get("totalScores")
     elif leaderboard_type == "boss-standard":
-        boss = pick_current_or_latest(raw.get("bosses", []))
+        boss = event
         if not boss:
             raise RuntimeError("Boss 数据为空")
         title = "Boss标准单人排行榜"
@@ -151,7 +159,7 @@ def build_single_leaderboard_table_data(leaderboard_type: str, page: int, raw: d
         is_boss = True
         total_submissions = boss.get("totalScores_standard")
     elif leaderboard_type == "boss-elite":
-        boss = pick_current_or_latest(raw.get("bosses", []))
+        boss = event
         if not boss:
             raise RuntimeError("Boss 数据为空")
         title = "Boss精英单人排行榜"
@@ -168,7 +176,7 @@ def build_single_leaderboard_table_data(leaderboard_type: str, page: int, raw: d
     else:
         raise ValueError(f"不支持的排行榜类型: {leaderboard_type}")
 
-    if not board_url:
+    if not board_url and event_scope != "ended":
         raise RuntimeError("排行榜地址为空")
 
     return {
@@ -253,13 +261,18 @@ def resolve_leaderboard(
     page: int,
     output_format: str = "markdown",
     refresh: bool = False,
+    *,
+    event_scope: str = "relevant",
 ) -> tuple[Path, str, bool]:
     # 入口不再分页：统一锁定第一页作为起点，图片按活动类型拉取固定人数。
     page = 1
     format_key = output_format if output_format == "markdown" else "image-fixed"
     key = f"leaderboard:{leaderboard_type}:{format_key}"
+    if event_scope not in {"relevant", "ended"}:
+        raise ValueError("排行榜范围支持 relevant 和 ended。")
+    history = event_scope == "ended"
     index_data = load_index()
-    if not refresh:
+    if not refresh and not history:
         if output_format == "markdown":
             cached_path, cached_content = get_cached_content(index_data, key)
             if cached_path and cached_content is not None:
@@ -271,23 +284,56 @@ def resolve_leaderboard(
     stale_content_path = None
     stale_content = None
     stale_image_path = None
-    if output_format == "markdown":
+    if not history and output_format == "markdown":
         stale_content_path, stale_content = get_cached_content(index_data, key, allow_stale=True)
-    else:
+    elif not history:
         stale_image_path = get_cached_path(index_data, key, allow_stale=True)
 
+    historical_path = None
     try:
-        raw = fetch_leaderboard_raw_data(client, leaderboard_type)
-        table_data = build_single_leaderboard_table_data(leaderboard_type, page, raw)
+        if history:
+            activity_type = "race" if leaderboard_type == "race" else "boss"
+            list_key = "races" if activity_type == "race" else "bosses"
+            events = {
+                event_id: archived_event(snapshot)
+                for event_id, snapshot in archived_activity_snapshots(activity_type).items()
+            }
+            try:
+                live = fetch_leaderboard_raw_data(client, leaderboard_type)[list_key]
+            except RuntimeError:
+                if not events:
+                    raise
+            else:
+                events.update({str(item["id"]): item for item in live if item.get("id")})
+            raw = {list_key: list(events.values())}
+        else:
+            raw = fetch_leaderboard_raw_data(client, leaderboard_type)
+        table_data = build_single_leaderboard_table_data(
+            leaderboard_type, page, raw, event_scope=event_scope,
+        )
+        if history:
+            extension = ".md" if output_format == "markdown" else ".png"
+            stem = f"{table_data['event_id']}_{table_data['suffix']}"
+            folder = OUTPUT_DIR / table_data["folder"]
+            historical_path = folder / f"{stem}{extension}"
+            ended_path = folder / f"{stem}_ended{extension}"
+            if ended_path.is_file() and not refresh:
+                return ended_path, ended_path.read_text(encoding="utf-8") if extension == ".md" else "", True
+        if not table_data["board_url"]:
+            raise RuntimeError("排行榜地址为空")
         if output_format == "markdown":
             try:
                 payload = client.get(append_page(table_data["board_url"], page))
+                if history and not payload.get("body"):
+                    raise RuntimeError("已结束活动的官方排行榜暂无可用成绩")
                 content = render_markdown_report(table_data, payload)
             except RuntimeError as exc:
-                if not _is_no_scores_error(exc):
+                if history or not _is_no_scores_error(exc):
                     raise
                 content = _render_no_scores_markdown(table_data, page)
             file_path = OUTPUT_DIR / table_data["folder"] / f"{table_data['event_id']}_{table_data['suffix']}.md"
+            if history:
+                file_path = ended_path
             save_cached_file(file_path, content)
         elif output_format == "image":
             entries: list[dict[str, Any]] = []
@@ -306,12 +352,14 @@ def resolve_leaderboard(
                 else:
                     # 竞速固定前 100 人：第一页和第二页。
                     payload_1 = client.get(append_page(table_data["board_url"], 1))
-                    payload_2 = client.get(append_page(table_data["board_url"], 2))
-                    entries = list(payload_1.get("body", [])) + list(payload_2.get("body", []))
+                    entries = list(payload_1.get("body", []))
+                    if int(payload_1.get("maxPages", 2) or 1) >= 2:
+                        payload_2 = client.get(append_page(table_data["board_url"], 2))
+                        entries.extend(payload_2.get("body", []))
                     entries = entries[:100]
                     image_total_pages = 1
             except RuntimeError as exc:
-                if not _is_no_scores_error(exc):
+                if history or not _is_no_scores_error(exc):
                     raise
                 table_data["total_submissions"] = 0
 
@@ -325,15 +373,23 @@ def resolve_leaderboard(
                 for item in entries
             ]
             file_path = OUTPUT_DIR / table_data["folder"] / f"{table_data['event_id']}_{table_data['suffix']}.png"
+            if history:
+                if not entries:
+                    raise RuntimeError("已结束活动的官方排行榜暂无可用成绩")
+                file_path = ended_path
             render_leaderboard_image(table_data, rendered_entries, image_total_pages, file_path)
             content = ""
         else:
             raise ValueError(f"不支持的排行榜输出格式: {output_format}")
 
-        index_put(index_data, key, table_data["event_id"], file_path)
-        save_index(index_data)
+        if not history:
+            index_put(index_data, key, table_data["event_id"], file_path)
+            save_index(index_data)
         return file_path, content, False
     except Exception as exc:  # noqa: BLE001
+        if historical_path is not None and historical_path.is_file():
+            content = historical_path.read_text(encoding="utf-8") if output_format == "markdown" else ""
+            return historical_path, content, True
         if stale_content_path and stale_content is not None:
             return stale_content_path, stale_content, True
         if stale_image_path:

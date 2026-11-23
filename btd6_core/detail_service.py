@@ -4,6 +4,7 @@ from pathlib import Path
 
 from api_raw_fetcher import ApiClient
 from btd6_core.activity_formatter import format_activity_snapshot
+from btd6_core.activity_models import ActivitySnapshot
 from btd6_core.activity_repository import resolve_activity_snapshot
 from btd6_core.cache_store import OUTPUT_DIR, save_cached_file
 from btd6_core.common import sanitize_id
@@ -26,8 +27,19 @@ def resolve_detail(
         event_scope=event_scope,
         refresh=refresh,
     )
+    file_path, content = write_activity_detail(snapshot, difficulty=difficulty)
+    return file_path, content, cached
+
+
+def write_activity_detail(
+    snapshot: ActivitySnapshot, *, difficulty: str, numbered: bool = False,
+) -> tuple[Path, str]:
+    detail_type = snapshot.activity_type
+    event_scope = snapshot.event_scope
     variant = f"_{difficulty}" if detail_type == "odyssey" else ""
     scope_suffix = "" if event_scope == "latest" else f"_{event_scope}"
+    if numbered:
+        scope_suffix = "_event"
     file_path = (
         OUTPUT_DIR
         / detail_type
@@ -35,4 +47,4 @@ def resolve_detail(
     )
     content = format_activity_snapshot(snapshot)
     save_cached_file(file_path, content)
-    return file_path, content, cached
+    return file_path, content

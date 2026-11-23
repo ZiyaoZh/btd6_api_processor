@@ -46,6 +46,7 @@ from btd6_core.collection_event_service import (
     _resolve_tower_icon_path,
 )
 from btd6_core.image_renderer import _load_font
+from btd6_core.leaderboard_service import resolve_leaderboard
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -400,6 +401,63 @@ class ActivityPipelineTests(unittest.TestCase):
         self.assertEqual(restored.availability, "stale")
         self.assertIn("offline", restored.stale_reason)
         self.assertEqual(restored.challenges[0].tower_rules, snapshot.challenges[0].tower_rules)
+
+    def test_boss_number_uses_retained_snapshot_without_a_cache_index(self) -> None:
+        snapshot = ActivitySnapshot(
+            schema_version=2, activity_type="boss", event_id="Dreadbloon38_example",
+            name="Dreadbloon38", description="", start_at=100, end_at=200,
+            status="current", event_scope="relevant", fetched_at="2026-09-27T00:00:00+00:00",
+            attributes={"boss_type_name": "恐怖气球"},
+        )
+        with (
+            tempfile.TemporaryDirectory() as temp_dir,
+            patch("btd6_core.activity_repository.OUTPUT_DIR", Path(temp_dir)),
+            patch("btd6_core.activity_repository.load_index", return_value={"items": {}}),
+        ):
+            path = Path(temp_dir) / "snapshots" / "boss" / "dreadbloon38_default_relevant.json"
+            path.parent.mkdir(parents=True)
+            path.write_text(json.dumps(snapshot.to_dict()), encoding="utf-8")
+            client = FixtureClient({"/btd6/bosses": {"body": []}})
+            for query in ("Dreadbloon38", "38"):
+                result_path, restored, cached = resolve_activity_snapshot(
+                    client, TRANSLATIONS, "boss", event_query=query,
+                )
+                self.assertTrue(cached)
+                self.assertTrue(result_path.is_file())
+                self.assertEqual(restored.event_id, snapshot.event_id)
+                self.assertEqual(restored.status, "ended")
+            self.assertEqual(client.calls, ["/btd6/bosses"])
+
+            other = replace(snapshot, event_id="Vortex38_example", name="Vortex38")
+            path.with_name("vortex38_default_relevant.json").write_text(
+                json.dumps(other.to_dict()), encoding="utf-8",
+            )
+            with self.assertRaisesRegex(ValueError, "Dreadbloon38|Vortex38"):
+                resolve_activity_snapshot(client, TRANSLATIONS, "boss", event_query="38")
+
+    def test_previous_leaderboard_only_reuses_scores_for_the_selected_event(self) -> None:
+        events = [
+            {"id": "current", "start": 100, "end": 9999999999999, "leaderboard": "https://example.test/current"},
+            {"id": "ended", "start": 10, "end": 50, "leaderboard": "https://example.test/ended"},
+        ]
+        client = FixtureClient({"/btd6/races": {"body": events}})
+        with (
+            tempfile.TemporaryDirectory() as temp_dir,
+            patch("btd6_core.leaderboard_service.OUTPUT_DIR", Path(temp_dir)),
+            patch("btd6_core.leaderboard_service.load_index", return_value={"items": {}}),
+            patch("btd6_core.leaderboard_service.archived_activity_snapshots", return_value={}),
+        ):
+            folder = Path(temp_dir) / "race"
+            folder.mkdir()
+            (folder / "current_top100.md").write_text("current", encoding="utf-8")
+            with self.assertRaisesRegex(RuntimeError, "example.test/ended"):
+                resolve_leaderboard(client, "race", 1, event_scope="ended")
+            expected = folder / "ended_top100.md"
+            expected.write_text("retained scores", encoding="utf-8")
+            result_path, content, cached = resolve_leaderboard(client, "race", 1, event_scope="ended")
+            self.assertEqual(result_path, expected)
+            self.assertEqual(content, "retained scores")
+            self.assertTrue(cached)
 
     def test_successful_empty_scope_never_falls_back_to_stale_activity(self) -> None:
         fixture = _fixture("race_end_of_line.json")

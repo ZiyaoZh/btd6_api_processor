@@ -18,7 +18,7 @@ from btd6_core.activity_repository import resolve_activity_snapshot
 from btd6_core.cache_store import resolve_project_path
 from btd6_core.collection_event_service import resolve_collection_event
 from btd6_core.common import parse_translation_tables
-from btd6_core.detail_service import resolve_detail
+from btd6_core.detail_service import write_activity_detail
 from btd6_core.leaderboard_service import resolve_leaderboard
 from btd6_core.summary_service import resolve_summary
 from btd6_core.update_service import update_all_data
@@ -64,6 +64,7 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="活动范围：当前、下一期、最近结束、当前相关或旧版 latest；detail 默认 latest，all 总览默认 relevant。",
     )
+    parser.add_argument("--event-query", default="", help="detail 模式按活动 ID、名称或 Boss 编号查询。")
     parser.add_argument(
         "--leaderboard-format",
         choices=["markdown", "image"],
@@ -110,23 +111,19 @@ def main() -> int:
             paths: list[Path] = []
             blocks: list[str] = []
             for detail_type in requested:
-                snapshot_path, _snapshot, snapshot_cached = resolve_activity_snapshot(
+                snapshot_path, snapshot, cached = resolve_activity_snapshot(
                     client,
                     trans,
                     detail_type,
                     difficulty=args.difficulty,
                     event_scope=event_scope,
                     refresh=False,
+                    event_query=args.event_query,
                 )
-                path, content, cached = resolve_detail(
-                    client,
-                    trans,
-                    detail_type,
-                    refresh=False,
-                    difficulty=args.difficulty,
-                    event_scope=event_scope,
+                path, content = write_activity_detail(
+                    snapshot, difficulty=args.difficulty, numbered=bool(args.event_query),
                 )
-                source = "缓存" if cached and snapshot_cached else "远程"
+                source = "缓存" if cached else "远程"
                 blocks.append(
                     f"# 来源: {source}\n# 文件: {path}\n# JSON: {snapshot_path}\n\n{content}"
                 )
@@ -182,6 +179,7 @@ def main() -> int:
                 args.leaderboard_type,
                 1,
                 output_format=args.leaderboard_format,
+                event_scope=args.event_scope or "relevant",
                 refresh=False,
             )
             source = "缓存" if cached else "远程"
