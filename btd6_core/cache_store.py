@@ -5,6 +5,7 @@ import time
 from datetime import datetime
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 OUTPUT_DIR = PROJECT_ROOT / "output"
@@ -43,14 +44,18 @@ def load_index() -> dict[str, Any]:
 
 
 def save_index(index_data: dict[str, Any]) -> None:
-    INDEX_PATH.parent.mkdir(parents=True, exist_ok=True)
-    INDEX_PATH.write_text(json.dumps(index_data, ensure_ascii=False, indent=2), encoding="utf-8")
+    save_cached_file(INDEX_PATH, json.dumps(index_data, ensure_ascii=False, indent=2))
 
 
 def save_cached_file(path: Path, content: str) -> None:
     abs_path = resolve_project_path(path)
     abs_path.parent.mkdir(parents=True, exist_ok=True)
-    abs_path.write_text(content, encoding="utf-8")
+    temporary = abs_path.with_name(f".{abs_path.name}.{uuid4().hex}.tmp")
+    try:
+        temporary.write_text(content, encoding="utf-8")
+        temporary.replace(abs_path)
+    finally:
+        temporary.unlink(missing_ok=True)
 
 
 def _item_updated_at_epoch(item: dict[str, Any]) -> int | None:
